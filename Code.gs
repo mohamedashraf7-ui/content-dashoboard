@@ -552,6 +552,77 @@ function saveProjectMapping(projectName, mappingJson) {
   return { success:true };
 }
 
+// ═══ GOOGLE DRIVE CASE MAPPING ═══════════════════════════════════════════════
+var DRIVE_FOLDER_ID = '16UhJIyxDXa8Y9Allnot1lvKB57W5Dy49';
+
+function searchDriveForCase(caseNo) {
+  try {
+    var folder = DriveApp.getFolderById(DRIVE_FOLDER_ID);
+    var results = [];
+    // Search files whose name contains the case number
+    var files = folder.searchFiles('title contains "' + caseNo + '"');
+    while (files.hasNext()) {
+      var f = files.next();
+      results.push({ id: f.getId(), name: f.getName(), url: f.getUrl(), mimeType: f.getMimeType() });
+    }
+    // Also search subfolders one level deep
+    var subFolders = folder.getFolders();
+    while (subFolders.hasNext()) {
+      var sub = subFolders.next();
+      var subFiles = sub.searchFiles('title contains "' + caseNo + '"');
+      while (subFiles.hasNext()) {
+        var sf = subFiles.next();
+        results.push({ id: sf.getId(), name: sf.getName(), url: sf.getUrl(), mimeType: sf.getMimeType() });
+      }
+    }
+    return results;
+  } catch(e) {
+    return [];
+  }
+}
+
+function saveCaseDriveLink(agent, caseNo, fileName, url) {
+  var email = Session.getActiveUser().getEmail();
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('Case Drive Links');
+  if (!sheet) {
+    sheet = ss.insertSheet('Case Drive Links');
+    sheet.appendRow(['ID','Agent','Case No','File Name','URL','Linked By','Linked At']);
+  }
+  var id = 'dl_' + new Date().getTime();
+  sheet.appendRow([id, agent, caseNo, fileName, url, email, new Date().toISOString()]);
+  return { success: true };
+}
+
+function getCaseDriveLinks(agent) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('Case Drive Links');
+  if (!sheet) return [];
+  var data = sheet.getDataRange().getValues();
+  var results = [];
+  for (var i = 1; i < data.length; i++) {
+    var row = data[i];
+    if (String(row[1]).trim() === agent) {
+      results.push({ id: String(row[0]), agent: String(row[1]), caseNo: String(row[2]), fileName: String(row[3]), url: String(row[4]), linkedBy: String(row[5]), linkedAt: String(row[6]) });
+    }
+  }
+  return results;
+}
+
+function removeCaseDriveLink(linkId) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('Case Drive Links');
+  if (!sheet) return { success: false };
+  var data = sheet.getDataRange().getValues();
+  for (var i = 1; i < data.length; i++) {
+    if (String(data[i][0]) === linkId) {
+      sheet.deleteRow(i + 1);
+      return { success: true };
+    }
+  }
+  return { success: false };
+}
+
 function saveAttendance(agent, date, status, notes) {
   var email = Session.getActiveUser().getEmail();
   var ss    = SpreadsheetApp.getActiveSpreadsheet();
