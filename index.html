@@ -1232,6 +1232,32 @@ function renderDD(){
   const caseRows=eR.sort((a,b)=>(b.endISO||'').localeCompare(a.endISO||'')).slice(0,200);
   html+=`<div class="card" style="margin-bottom:14px"><div class="sh"><div class="stit">Case Breakdown — ${emp}</div><div style="font-size:12px;color:var(--mu)">${eR.length} total rows</div></div><div style="overflow:auto"><table><thead><tr><th>End Date</th><th>Case #</th><th>Vendor</th><th>Type</th><th>Status</th><th>Days</th><th>Comment</th></tr></thead><tbody>${caseRows.map(r=>{const bc=r.status==='Done'?'bd':r.status==='Rejected'?'br':r.status==='Pending Feedback'?'bb':'bp';const days=(r.startISO&&r.endISO)?Math.round((new Date(r.endISO)-new Date(r.startISO))/(86400000)):'—';return`<tr><td style="font-weight:600">${r.endISO||'—'}</td><td style="color:var(--mu)">${r.caseNo||'—'}</td><td>${r.vendor||'—'}</td><td style="color:var(--mu)">${r.caseType||'—'}</td><td><span class="badge ${bc}">${r.status||'—'}</span></td><td style="color:${typeof days==='number'?(days<=3?'var(--gr)':days<=7?'var(--ye)':'var(--re)'):'var(--mu)'};font-weight:${typeof days==='number'?700:400}">${days}</td><td style="color:var(--mu);font-size:11px;max-width:160px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${r.comment}">${r.comment||'—'}</td></tr>`;}).join('')}</tbody></table></div></div>`;
 
+  // Q4: Google Drive Case Files
+  html+=`<div class="card" style="margin-bottom:14px" id="dd-drive-wrap">
+    <div class="sh" style="margin-bottom:12px">
+      <div><div class="stit">📁 Google Drive — Case Files</div><div style="font-size:11px;color:var(--mu);margin-top:2px">Link Drive files to any case number</div></div>
+      <a href="https://drive.google.com/drive/folders/16UhJIyxDXa8Y9Allnot1lvKB57W5Dy49" target="_blank" class="btn" style="font-size:11px;text-decoration:none">Open Drive Folder ↗</a>
+    </div>
+    <!-- Link a file to a case -->
+    <div style="background:var(--sur2);border-radius:var(--rs);padding:12px;margin-bottom:14px">
+      <div style="font-size:12px;font-weight:700;margin-bottom:10px">➕ Link a Drive File to a Case</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+        <div class="fg"><label class="fl">Case Number</label><input type="text" id="drive-case-no" placeholder="e.g. 00123456"/></div>
+        <div class="fg"><label class="fl">Search Drive for this case</label><button class="btn btnp" style="width:100%;margin-top:2px" onclick="searchDriveCase()">🔍 Search Files</button></div>
+      </div>
+      <div id="drive-search-results" style="display:none;background:var(--bg);border:1px solid var(--bor);border-radius:var(--rs);padding:8px;margin-bottom:8px;max-height:180px;overflow-y:auto"></div>
+      <div style="font-size:11px;color:var(--di);margin-bottom:8px">— or paste a Drive link manually —</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:end">
+        <div class="fg"><label class="fl">File Name</label><input type="text" id="drive-file-name" placeholder="e.g. Vendor Content Sheet"/></div>
+        <div class="fg"><label class="fl">Drive URL</label><input type="text" id="drive-file-url" placeholder="https://drive.google.com/..."/></div>
+        <button class="btn btnp" style="height:34px" onclick="saveDriveLink('${emp}')">Save Link</button>
+      </div>
+      <span id="drive-link-status" style="font-size:11px;color:var(--mu);margin-top:6px;display:block"></span>
+    </div>
+    <!-- Existing linked files -->
+    <div id="dd-drive-files"><div style="color:var(--mu);font-size:13px">Loading linked files…</div></div>
+  </div>`;
+
   // Q2: Notes section (manager view — can add + mark done)
   html+=`<div class="card" id="dd-notes-wrap">
     <div class="sh"><div class="stit">1:1 Coaching Notes — ${emp}</div></div>
@@ -1249,6 +1275,96 @@ function renderDD(){
 
   el.innerHTML=html;
   loadNotesForDD(emp);
+  loadDriveLinks(emp);
+}
+
+// ── Google Drive case-file functions ─────────────────────────────────────────
+function searchDriveCase() {
+  const caseNo = (document.getElementById('drive-case-no').value||'').trim();
+  if (!caseNo) { alert('Enter a case number first.'); return; }
+  const res = document.getElementById('drive-search-results');
+  res.style.display = 'block';
+  res.innerHTML = '<span style="color:var(--mu);font-size:12px">Searching Drive…</span>';
+  google.script.run
+    .withSuccessHandler(function(files) {
+      if (!files || !files.length) {
+        res.innerHTML = '<span style="color:var(--di);font-size:12px">No files found matching that case number.</span>';
+        return;
+      }
+      res.innerHTML = files.map(f =>
+        `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--bor)">
+          <span style="font-size:13px">📄</span>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${f.name}</div>
+            <div style="font-size:10px;color:var(--mu)">${f.mimeType||''}</div>
+          </div>
+          <button class="btn" style="font-size:10px;padding:3px 8px;flex-shrink:0" onclick="
+            document.getElementById('drive-file-name').value=\`${f.name.replace(/`/g,"'")}\`;
+            document.getElementById('drive-file-url').value=\`${f.url}\`;
+            document.getElementById('drive-search-results').style.display='none';
+          ">Use</button>
+          <a href="${f.url}" target="_blank" class="btn" style="font-size:10px;padding:3px 8px;text-decoration:none;flex-shrink:0">Open ↗</a>
+        </div>`
+      ).join('');
+    })
+    .withFailureHandler(function(e) { res.innerHTML = `<span style="color:var(--re);font-size:12px">Error: ${e.message||e}</span>`; })
+    .searchDriveForCase(caseNo);
+}
+
+function saveDriveLink(emp) {
+  const caseNo  = (document.getElementById('drive-case-no').value||'').trim();
+  const name    = (document.getElementById('drive-file-name').value||'').trim();
+  const url     = (document.getElementById('drive-file-url').value||'').trim();
+  const st      = document.getElementById('drive-link-status');
+  if (!caseNo || !name || !url) { alert('Fill in case number, file name, and URL.'); return; }
+  st.textContent = 'Saving…'; st.style.color = 'var(--mu)';
+  google.script.run
+    .withSuccessHandler(function() {
+      st.textContent = '✅ Linked!'; st.style.color = 'var(--gr)';
+      document.getElementById('drive-file-name').value = '';
+      document.getElementById('drive-file-url').value  = '';
+      loadDriveLinks(emp);
+    })
+    .withFailureHandler(function(e) { st.textContent = '❌ ' + (e.message||e); st.style.color = 'var(--re)'; })
+    .saveCaseDriveLink(emp, caseNo, name, url);
+}
+
+function loadDriveLinks(emp) {
+  const el = document.getElementById('dd-drive-files');
+  if (!el) return;
+  google.script.run
+    .withSuccessHandler(function(links) {
+      if (!links || !links.length) {
+        el.innerHTML = '<div style="color:var(--mu);font-size:13px;padding:6px 0">No files linked yet. Search or paste a Drive URL above.</div>';
+        return;
+      }
+      // Group by case number
+      const byCase = {};
+      links.forEach(function(l) { if (!byCase[l.caseNo]) byCase[l.caseNo] = []; byCase[l.caseNo].push(l); });
+      el.innerHTML = Object.keys(byCase).sort().map(function(cn) {
+        return `<div style="margin-bottom:12px">
+          <div style="font-size:11px;font-weight:700;color:var(--mu);margin-bottom:6px">Case #${cn}</div>
+          ${byCase[cn].map(function(l) { return `<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:var(--sur2);border-radius:var(--rs);margin-bottom:4px">
+            <span style="font-size:14px">📄</span>
+            <div style="flex:1;min-width:0">
+              <a href="${l.url}" target="_blank" style="font-size:12px;font-weight:600;color:var(--bl);text-decoration:none">${l.fileName}</a>
+              <div style="font-size:10px;color:var(--di)">${l.linkedAt ? new Date(l.linkedAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : ''}</div>
+            </div>
+            <button class="btn" style="font-size:10px;padding:2px 7px;color:var(--re)" onclick="removeDriveLink('${emp}','${l.id}')">✕</button>
+          </div>`; }).join('')}
+        </div>`;
+      }).join('');
+    })
+    .withFailureHandler(function(){})
+    .getCaseDriveLinks(emp);
+}
+
+function removeDriveLink(emp, linkId) {
+  if (!confirm('Remove this file link?')) return;
+  google.script.run
+    .withSuccessHandler(function() { loadDriveLinks(emp); })
+    .withFailureHandler(function(e) { alert('Error: ' + (e.message||e)); })
+    .removeCaseDriveLink(linkId);
 }
 
 function loadNotesForDD(emp){
