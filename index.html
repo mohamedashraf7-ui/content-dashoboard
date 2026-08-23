@@ -325,6 +325,18 @@ tr:hover td{background:var(--sur2)}
           <div class="card"><div class="sh"><div class="stit">Overall queue status</div></div><div id="qs"></div></div>
         </div>
 
+        <!-- Main Requests Tracker -->
+        <div class="card" style="margin-bottom:14px">
+          <div class="sh" style="margin-bottom:10px">
+            <div>
+              <div class="stit">📋 Main Requests — This Month</div>
+              <div style="font-size:11px;color:var(--mu);margin-top:2px">Day-over-day tracking from Main Request sheet · Done / Cancelled / Pending</div>
+            </div>
+            <button class="btn" style="font-size:11px" onclick="loadMainRequestData()">↻ Refresh</button>
+          </div>
+          <div id="mr-section"><div style="color:var(--mu);font-size:12px;padding:8px 0">Loading…</div></div>
+        </div>
+
         <!-- Q4: Daily progress section -->
         <div class="card">
           <div class="sh">
@@ -394,6 +406,13 @@ tr:hover td{background:var(--sur2)}
           <button class="btn" onclick="loadAllDriveData()">📂 Browse All</button></div>
       </div>
       <div id="cl-body"><div style="color:var(--mu);padding:40px;text-align:center">Enter a case number above, or click Browse All to see all Drive records</div></div>
+      <div class="card" style="margin-top:18px">
+        <div class="sh" style="margin-bottom:12px">
+          <div><div class="stit">⏳ Pending Cases Tracker</div><div style="font-size:11px;color:var(--mu)">All cases with Pending or Pending Feedback status · sorted oldest first</div></div>
+          <button class="btn" onclick="renderPendingTracker()">🔄 Refresh</button>
+        </div>
+        <div id="pending-tracker"><div style="color:var(--mu);font-size:13px;text-align:center;padding:20px">Loading…</div></div>
+      </div>
     </div>
 
     <!-- ══ MANAGER: REPORTS ════════════════════════════════════════════════ -->
@@ -586,6 +605,7 @@ tr:hover td{background:var(--sur2)}
         <button id="stab-attendance" class="stab" onclick="switchSettingsTab('attendance')">📅 Attendance</button>
         <button id="stab-sla" class="stab" onclick="switchSettingsTab('sla')">⏱️ SLA Targets</button>
         <button id="stab-config" class="stab" onclick="switchSettingsTab('config')">⚙️ Config</button>
+        <button id="stab-whatsapp" class="stab" onclick="switchSettingsTab('whatsapp')">📱 WhatsApp</button>
       </div>
 
       <!-- Targets Tab -->
@@ -593,6 +613,9 @@ tr:hover td{background:var(--sur2)}
         <div style="font-size:13px;color:var(--mu);margin-bottom:14px">Set daily case targets per agent. Use a lower target for special projects or reduced availability. Changes reflect immediately in all daily views.</div>
         <div id="targets-table"><div class="loading"><div class="spin"></div></div></div>
       </div>
+
+      <!-- SKU Targets Section (inside targets tab, rendered dynamically) -->
+      <div id="sku-targets-section" style="margin-top:18px"></div>
 
       <!-- Attendance Tab -->
       <div id="stab-attendance-body" style="display:none">
@@ -653,6 +676,166 @@ tr:hover td{background:var(--sur2)}
           <button class="btn btnp" style="width:100%;justify-content:center;padding:10px" onclick="doRefresh()">🔄 Refresh Data Now</button>
         </div>
       </div>
+
+      <!-- WhatsApp Tab -->
+      <div id="stab-whatsapp-body" style="display:none">
+
+        <!-- Connection Setup -->
+        <div class="card" style="margin-bottom:14px">
+          <div class="sh" style="margin-bottom:14px">
+            <div>
+              <div class="stit">📱 WhatsApp — CallMeBot Setup</div>
+              <div style="font-size:11px;color:var(--mu);margin-top:2px">Send team progress updates via WhatsApp at scheduled intervals</div>
+            </div>
+            <span id="wa-status-badge" style="font-size:11px;padding:3px 10px;border-radius:20px;background:var(--sur2);color:var(--mu)">⚪ Not configured</span>
+          </div>
+
+          <div style="background:var(--gr2);border-radius:var(--rs);padding:10px 14px;margin-bottom:14px;font-size:12px;color:var(--gr)">
+            ✅ <strong>Configured</strong> — updates will be sent to your personal WhatsApp. Run <code style="background:var(--bg);padding:1px 5px;border-radius:3px;color:var(--tx)">_initWaCredentials()</code> once in Apps Script editor to save credentials, then click <strong>Send Test</strong> below to verify.
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+            <div class="fg">
+              <label class="fl">Your WhatsApp Number <span style="color:var(--gr);font-size:10px">● Saved in Script Properties</span></label>
+              <input type="text" id="wa-phone" placeholder="+201020809266" style="font-family:monospace"/>
+            </div>
+            <div class="fg">
+              <label class="fl">CallMeBot API Key <span style="color:var(--gr);font-size:10px">● Saved in Script Properties</span></label>
+              <input type="password" id="wa-apikey" placeholder="••••••••••••" style="font-family:monospace"/>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            <button class="btn btnp" onclick="saveWaConfig()">💾 Save & Verify</button>
+            <button class="btn" onclick="sendWaTestMessage()">🧪 Send Test Message</button>
+            <span id="wa-config-status" style="font-size:11px;color:var(--mu)"></span>
+          </div>
+        </div>
+
+        <!-- Scheduled Intervals -->
+        <div class="card" style="margin-bottom:14px">
+          <div class="sh" style="margin-bottom:14px">
+            <div>
+              <div class="stit">⏰ Scheduled Intervals</div>
+              <div style="font-size:11px;color:var(--mu);margin-top:2px">Set up to 4 daily times to auto-send team progress updates</div>
+            </div>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;font-weight:600">
+              <input type="checkbox" id="wa-schedule-enabled" onchange="saveWaSchedule()"/>
+              Enable scheduled sending
+            </label>
+          </div>
+
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px">
+            <div style="background:var(--sur2);border-radius:var(--rs);padding:10px;text-align:center">
+              <div style="font-size:10px;font-weight:700;color:var(--mu);margin-bottom:6px">Interval 1</div>
+              <input type="time" id="wa-time-1" style="width:100%;text-align:center;font-size:13px;font-weight:600" onchange="saveWaSchedule()"/>
+              <label style="display:flex;align-items:center;justify-content:center;gap:5px;font-size:10px;color:var(--mu);margin-top:6px;cursor:pointer">
+                <input type="checkbox" id="wa-time-1-on" onchange="saveWaSchedule()"/> Active
+              </label>
+            </div>
+            <div style="background:var(--sur2);border-radius:var(--rs);padding:10px;text-align:center">
+              <div style="font-size:10px;font-weight:700;color:var(--mu);margin-bottom:6px">Interval 2</div>
+              <input type="time" id="wa-time-2" style="width:100%;text-align:center;font-size:13px;font-weight:600" onchange="saveWaSchedule()"/>
+              <label style="display:flex;align-items:center;justify-content:center;gap:5px;font-size:10px;color:var(--mu);margin-top:6px;cursor:pointer">
+                <input type="checkbox" id="wa-time-2-on" onchange="saveWaSchedule()"/> Active
+              </label>
+            </div>
+            <div style="background:var(--sur2);border-radius:var(--rs);padding:10px;text-align:center">
+              <div style="font-size:10px;font-weight:700;color:var(--mu);margin-bottom:6px">Interval 3</div>
+              <input type="time" id="wa-time-3" style="width:100%;text-align:center;font-size:13px;font-weight:600" onchange="saveWaSchedule()"/>
+              <label style="display:flex;align-items:center;justify-content:center;gap:5px;font-size:10px;color:var(--mu);margin-top:6px;cursor:pointer">
+                <input type="checkbox" id="wa-time-3-on" onchange="saveWaSchedule()"/> Active
+              </label>
+            </div>
+            <div style="background:var(--sur2);border-radius:var(--rs);padding:10px;text-align:center">
+              <div style="font-size:10px;font-weight:700;color:var(--mu);margin-bottom:6px">Interval 4</div>
+              <input type="time" id="wa-time-4" style="width:100%;text-align:center;font-size:13px;font-weight:600" onchange="saveWaSchedule()"/>
+              <label style="display:flex;align-items:center;justify-content:center;gap:5px;font-size:10px;color:var(--mu);margin-top:6px;cursor:pointer">
+                <input type="checkbox" id="wa-time-4-on" onchange="saveWaSchedule()"/> Active
+              </label>
+            </div>
+          </div>
+
+          <div style="background:var(--sur2);border-radius:var(--rs);padding:10px;font-size:12px">
+            <div style="font-weight:600;margin-bottom:6px">📋 Auto-sent message includes:</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              <span style="background:var(--bg);border:1px solid var(--bor);padding:2px 8px;border-radius:10px;font-size:11px">Team total vs target</span>
+              <span style="background:var(--bg);border:1px solid var(--bor);padding:2px 8px;border-radius:10px;font-size:11px">Per-agent breakdown</span>
+              <span style="background:var(--bg);border:1px solid var(--bor);padding:2px 8px;border-radius:10px;font-size:11px">Top performer today</span>
+              <span style="background:var(--bg);border:1px solid var(--bor);padding:2px 8px;border-radius:10px;font-size:11px">Pending &amp; Rejected count</span>
+              <span style="background:var(--bg);border:1px solid var(--bor);padding:2px 8px;border-radius:10px;font-size:11px">EOD performance summary</span>
+              <span style="background:var(--bg);border:1px solid var(--bor);padding:2px 8px;border-radius:10px;font-size:11px">Team plan for tomorrow</span>
+            </div>
+          </div>
+
+          <div style="margin-top:12px;display:flex;gap:10px;align-items:center">
+            <button class="btn btnp" onclick="triggerWaProgressNow()">📤 Send Progress Update Now</button>
+            <span id="wa-schedule-status" style="font-size:11px;color:var(--mu)"></span>
+          </div>
+        </div>
+
+        <!-- Manual Message Composer -->
+        <div class="card">
+          <div class="sh" style="margin-bottom:14px">
+            <div>
+              <div class="stit">✍️ Manual Message</div>
+              <div style="font-size:11px;color:var(--mu);margin-top:2px">Ask about a specific case, project, or send a custom update</div>
+            </div>
+            <!-- Send to selector -->
+            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+              <label style="font-size:10px;color:var(--mu);font-weight:600">SEND TO</label>
+              <div style="display:flex;gap:6px">
+                <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;background:var(--sur2);padding:4px 10px;border-radius:20px;border:1px solid var(--bor)">
+                  <input type="radio" name="wa-recipient" value="me" checked onchange="waToggleGroupField()"/> 👤 My Number
+                </label>
+                <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;background:var(--sur2);padding:4px 10px;border-radius:20px;border:1px solid var(--bor)">
+                  <input type="radio" name="wa-recipient" value="group" onchange="waToggleGroupField()"/> 👥 Group
+                </label>
+              </div>
+              <div id="wa-group-field" style="display:none;margin-top:4px">
+                <input type="text" id="wa-group-phone" placeholder="Group phone / ID" style="font-size:12px;width:200px;font-family:monospace" oninput="saveWaGroupPhone()"/>
+                <div style="font-size:9px;color:var(--di);margin-top:2px">Add CallMeBot to group → send activation msg → paste ID</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Case number auto-lookup -->
+          <div style="background:var(--sur2);border-radius:var(--rs);padding:10px 12px;margin-bottom:12px">
+            <div style="font-size:11px;font-weight:700;color:var(--mu);margin-bottom:8px">🔍 Case Lookup — auto-fill message details</div>
+            <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
+              <div class="fg" style="min-width:160px">
+                <label class="fl">Case Number</label>
+                <input type="text" id="wa-lookup-case" placeholder="e.g. 00123456" oninput="waLookupCase()"/>
+              </div>
+              <div id="wa-case-info" style="flex:1;min-width:200px;display:none;background:var(--bg);border:1px solid var(--bor);border-radius:var(--rs);padding:8px 10px;font-size:12px"></div>
+            </div>
+          </div>
+
+          <div style="margin-bottom:10px">
+            <label class="fl">Quick Template</label>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+              <button class="btn" style="font-size:11px" onclick="waTemplate('case')">📋 Case Follow-up</button>
+              <button class="btn" style="font-size:11px" onclick="waTemplate('pending')">⏳ Pending Update</button>
+              <button class="btn" style="font-size:11px" onclick="waTemplate('urgent')">🚨 Urgent Action</button>
+              <button class="btn" style="font-size:11px" onclick="waTemplate('project')">🚀 Project Check</button>
+              <button class="btn" style="font-size:11px" onclick="waTemplate('eod')">🌙 EOD + Plan</button>
+            </div>
+          </div>
+
+          <div class="fg" style="margin-bottom:10px">
+            <label class="fl">Message</label>
+            <textarea id="wa-manual-msg" rows="6" placeholder="Type your message here, or pick a template above…"
+              style="width:100%;resize:vertical;font-family:var(--font);font-size:13px;padding:8px 10px;border:1px solid var(--bor);border-radius:var(--rs);background:var(--sur2);color:var(--tx)"></textarea>
+          </div>
+
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            <button class="btn btnp" onclick="sendWaManual()">📤 Send Message</button>
+            <button class="btn" onclick="document.getElementById('wa-manual-msg').value=''">🗑️ Clear</button>
+            <span id="wa-manual-status" style="font-size:11px;color:var(--mu)"></span>
+          </div>
+        </div>
+
+      </div>
     </div>
 
     <!-- ══ AGENT: OVERVIEW ═════════════════════════════════════════════════ -->
@@ -704,6 +887,9 @@ let PROJECT_CONFIGS  = {}; // { 'Project Name': { type, sheetUrl, chainName, tot
 let PROJECT_UPDATES  = []; // [{ agent, date, text, by }]
 let PROJECT_MAPPINGS = {}; // { projectName: { chainIdx, skuIdx, ... } }
 let PROJECT_LIVE_DATA= {}; // { projectName: { totalSku, correctedSku, ... } — live from sheet }
+let SKU_TARGETS   = {}; // { 'Mohamed Gadallah': { '2026-08': 500 } }
+let MR_DATA        = {}; // Main Request sheet data: { byAgent, totals, byDate }
+let DRIVE_CASE_MAP = {}; // { caseNo: agentName } — cases with linked Drive files
 let ATTENDANCE    = {}; // { 'Mohamed Gadallah': { '2026-07-30': 'Annual Leave' } }
 let SLA_TARGETS   = {}; // { 'Menu Update': 3, 'Merchant Onboarding': 5 } — days
 let attCalYear  = new Date().getFullYear();
@@ -799,6 +985,15 @@ function initApp(info, typedEmail) {
   loadNavPrefs();
   loadData();
   loadSettings();
+  loadMainRequestData();
+  loadDriveCaseMap();
+}
+
+function loadDriveCaseMap() {
+  google.script.run
+    .withSuccessHandler(function(m){ DRIVE_CASE_MAP = m || {}; })
+    .withFailureHandler(function(){})
+    .getAllDriveLinkCaseNos();
 }
 
 function applyViewMode() {
@@ -848,7 +1043,7 @@ function gp(id, el) {
   if (id==='settings')     switchSettingsTab('targets');
   if (id==='projects')     loadAndRenderProjects();
 if (id==='org')          renderOrgView();
-  if (id==='caselookup')   document.getElementById('cl-input').focus();
+  if (id==='caselookup')   { document.getElementById('cl-input').focus(); if(R.length) renderPendingTracker(); }
 }
 
 // ═══ THEME / LANG ══════════════════════════════════════════════════════════
@@ -955,6 +1150,220 @@ function showDataError(msg){
   if(load){ load.style.display='flex'; load.innerHTML=`<div style="text-align:center;padding:32px 20px;max-width:400px"><div style="font-size:32px;margin-bottom:10px">⚠️</div><div style="font-weight:700;margin-bottom:8px">Could not load data</div><div style="color:var(--mu);font-size:13px;margin-bottom:14px">${msg}</div><button class="btn btnp" onclick="doRefresh()">Retry</button></div>`; }
 }
 
+// ═══ MAIN REQUEST SHEET ════════════════════════════════════════════════════
+function loadMainRequestData() {
+  google.script.run
+    .withSuccessHandler(function(d) {
+      if (d && !d.error) {
+        MR_DATA = d;
+        const pg = document.querySelector('.page.on');
+        if (pg && pg.id === 'pg-overview') renderMRSection();
+      }
+    })
+    .withFailureHandler(function(){})
+    .getMainRequestData(null, null); // all-time: no date filter
+}
+
+function renderMRSection() {
+  const el = document.getElementById('mr-section');
+  if (!el) return;
+  const t  = MR_DATA.totals  || {};
+  const ba = MR_DATA.byAgent || {};
+  if (!t.total && !Object.keys(ba).length) {
+    el.innerHTML = '<div style="color:var(--mu);font-size:12px;padding:8px 0">No requests data yet.</div>';
+    return;
+  }
+
+  // Collect daily totals across all dates (sorted)
+  const allDates = Object.keys(MR_DATA.byDate||{}).sort();
+  const last14   = allDates.slice(-14);
+  const bad      = MR_DATA.byAgentDate || {};
+
+  // Team total summary pills
+  const pending = (t.pendingContent||0) + (t.pendingRegional||0);
+  const doneRate = t.total ? Math.round((t.done||0)/t.total*100) : 0;
+
+  let html = `
+  <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">
+    <div style="background:var(--sur2);border-radius:var(--rs);padding:10px 16px;text-align:center;min-width:80px">
+      <div style="font-size:22px;font-weight:800;color:var(--or)">${t.total||0}</div>
+      <div style="font-size:10px;color:var(--mu);font-weight:600">ASSIGNED</div>
+    </div>
+    <div style="background:#dcfce7;border-radius:var(--rs);padding:10px 16px;text-align:center;min-width:80px">
+      <div style="font-size:22px;font-weight:800;color:#16a34a">${t.done||0}</div>
+      <div style="font-size:10px;color:#16a34a;font-weight:600">DONE</div>
+    </div>
+    <div style="background:#fee2e2;border-radius:var(--rs);padding:10px 16px;text-align:center;min-width:80px">
+      <div style="font-size:22px;font-weight:800;color:#dc2626">${t.rejected||0}</div>
+      <div style="font-size:10px;color:#dc2626;font-weight:600">REJECTED</div>
+    </div>
+    <div style="background:#fef9c3;border-radius:var(--rs);padding:10px 16px;text-align:center;min-width:80px">
+      <div style="font-size:22px;font-weight:800;color:#ca8a04">${t.pendingContent||0}</div>
+      <div style="font-size:10px;color:#ca8a04;font-weight:600">PEND. CONTENT</div>
+    </div>
+    <div style="background:#ede9fe;border-radius:var(--rs);padding:10px 16px;text-align:center;min-width:80px">
+      <div style="font-size:22px;font-weight:800;color:#7c3aed">${t.pendingRegional||0}</div>
+      <div style="font-size:10px;color:#7c3aed;font-weight:600">PEND. REGIONAL</div>
+    </div>
+    <div style="background:var(--bg2);border-radius:var(--rs);padding:10px 16px;text-align:center;min-width:80px;border:1px solid var(--bor)">
+      <div style="font-size:22px;font-weight:800;color:var(--bl)">${t.cancelled||0}</div>
+      <div style="font-size:10px;color:var(--mu);font-weight:600">CANCELLED</div>
+    </div>
+  </div>
+  <div style="font-size:11px;color:var(--mu);margin-bottom:12px">Team done rate: <strong style="color:var(--gr)">${doneRate}%</strong> · All-time totals</div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px">`;
+
+  TEAM.forEach(function(nm) {
+    const a = ba[nm] || {done:0,rejected:0,cancelled:0,pendingContent:0,pendingRegional:0,total:0};
+    const pct     = a.total ? Math.round(a.done/a.total*100) : 0;
+    const pending = (a.pendingContent||0) + (a.pendingRegional||0);
+    const col     = pct>=80?'var(--gr)':pct>=50?'var(--or)':'var(--re)';
+    html += `<div style="background:var(--sur2);border-radius:var(--rs);padding:12px 14px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <div style="display:flex;align-items:center;gap:7px">
+          <div class="av" style="background:${COLORS[nm]};width:28px;height:28px;font-size:10px">${ini(nm)}</div>
+          <div>
+            <div style="font-size:12px;font-weight:700">${nm.split(' ')[0]}</div>
+            <div style="font-size:9px;color:var(--mu)">${a.total} assigned</div>
+          </div>
+        </div>
+        <div style="font-size:16px;font-weight:800;color:${col}">${pct}%</div>
+      </div>
+      <div class="pbar" style="margin:0 0 8px"><div class="pfill" style="width:${pct}%;background:${col}"></div></div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;font-size:10px;text-align:center">
+        <div style="background:#dcfce7;border-radius:4px;padding:3px 0">
+          <div style="font-weight:700;color:#16a34a">${a.done}</div>
+          <div style="color:#16a34a">Done</div>
+        </div>
+        <div style="background:#fee2e2;border-radius:4px;padding:3px 0">
+          <div style="font-weight:700;color:#dc2626">${a.rejected||0}</div>
+          <div style="color:#dc2626">Rejected</div>
+        </div>
+        <div style="background:#ede9fe;border-radius:4px;padding:3px 0">
+          <div style="font-weight:700;color:#7c3aed">${a.pendingRegional||0}</div>
+          <div style="color:#7c3aed">Pend. Regional</div>
+        </div>
+      </div>
+      ${a.pendingContent>0?`<div style="margin-top:4px;font-size:9px;color:#ca8a04;text-align:center">⏳ ${a.pendingContent} Pending Content</div>`:''}
+      ${a.cancelled>0?`<div style="margin-top:2px;font-size:9px;color:var(--mu);text-align:center">✕ ${a.cancelled} Cancelled</div>`:''}
+    </div>`;
+  });
+  html += '</div>';
+
+  // ── Daily assignments table (last 14 days) ──────────────────────────────
+  if (last14.length) {
+    // Per-day max across team (for bar scaling)
+    const dayMax = Math.max(1, ...last14.map(d => (MR_DATA.byDate[d]||{}).total||0));
+
+    html += `<div style="margin-top:16px">
+      <div style="font-size:11px;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">
+        📅 Assigned Per Day — Last ${last14.length} days
+        <span style="font-size:9px;font-weight:400;color:var(--di);margin-left:6px">Date = when Owner was set on each request</span>
+      </div>
+      <div style="overflow-x:auto">
+        <table style="min-width:500px;border-collapse:collapse">
+          <thead>
+            <tr>
+              <th style="text-align:left;padding:4px 8px;font-size:10px;color:var(--mu);font-weight:600;white-space:nowrap">Agent</th>
+              ${last14.map(d => {
+                const lbl = new Date(d+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',day:'numeric',month:'short'});
+                const isToday = d === todayISO();
+                return `<th style="text-align:center;padding:4px 6px;font-size:9px;color:${isToday?'var(--or)':'var(--mu)'};font-weight:${isToday?700:600};white-space:nowrap${isToday?';border-bottom:2px solid var(--or)':''}">${lbl}</th>`;
+              }).join('')}
+              <th style="text-align:center;padding:4px 8px;font-size:10px;color:var(--mu);font-weight:700">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${TEAM.map(nm => {
+              const agentDates = (bad[nm]||{});
+              const rowTotal = last14.reduce((s,d) => s+(agentDates[d]||0), 0);
+              return `<tr>
+                <td style="padding:5px 8px;white-space:nowrap">
+                  <div style="display:flex;align-items:center;gap:6px">
+                    <div style="width:8px;height:8px;border-radius:50%;background:${COLORS[nm]};flex-shrink:0"></div>
+                    <span style="font-size:11px;font-weight:600">${nm.split(' ')[0]}</span>
+                  </div>
+                </td>
+                ${last14.map(d => {
+                  const n = agentDates[d]||0;
+                  const isToday = d === todayISO();
+                  const bg = n===0?'transparent':n>=5?'#dcfce7':n>=3?'#fef9c3':'#e0f2fe';
+                  const col= n===0?'var(--di)':n>=5?'#16a34a':n>=3?'#ca8a04':'#0369a1';
+                  return `<td style="text-align:center;padding:5px 6px;background:${isToday?'var(--sur2)':'transparent'};border-radius:4px">
+                    ${n>0?`<span style="background:${bg};color:${col};font-weight:700;font-size:11px;padding:2px 7px;border-radius:10px">${n}</span>`
+                        :`<span style="color:var(--di);font-size:10px">—</span>`}
+                  </td>`;
+                }).join('')}
+                <td style="text-align:center;padding:5px 8px;font-weight:800;font-size:13px;color:${COLORS[nm]}">${rowTotal}</td>
+              </tr>`;
+            }).join('')}
+            <tr style="border-top:1px solid var(--bor)">
+              <td style="padding:5px 8px;font-size:10px;font-weight:700;color:var(--mu)">Team Total</td>
+              ${last14.map(d => {
+                const n = (MR_DATA.byDate[d]||{}).total||0;
+                const isToday = d === todayISO();
+                return `<td style="text-align:center;padding:5px 6px;background:${isToday?'var(--sur2)':'transparent'}">
+                  <span style="font-size:10px;font-weight:700;color:${n>0?'var(--or)':'var(--di)'}">${n||'—'}</span>
+                </td>`;
+              }).join('')}
+              <td style="text-align:center;font-weight:800;color:var(--or)">${last14.reduce((s,d)=>s+((MR_DATA.byDate[d]||{}).total||0),0)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+  }
+
+  el.innerHTML = html;
+}
+
+function renderMRAgentSection(agentName) {
+  const el = document.getElementById('mr-agent-section');
+  if (!el) return;
+  if (!MR_DATA || !MR_DATA.byAgent) {
+    el.innerHTML = '<div style="color:var(--mu);font-size:12px">Loading…</div>';
+    setTimeout(function(){ if(MR_DATA&&MR_DATA.byAgent) renderMRAgentSection(agentName); }, 2500);
+    return;
+  }
+  const a   = (MR_DATA.byAgent || {})[agentName] || {done:0,rejected:0,cancelled:0,pendingContent:0,pendingRegional:0,total:0};
+  const pct = a.total ? Math.round(a.done/a.total*100) : 0;
+  const col = pct>=80?'var(--gr)':pct>=50?'var(--or)':'var(--re)';
+
+  el.innerHTML = `
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+    <div style="font-size:26px;font-weight:800;color:var(--or)">${a.total}</div>
+    <div>
+      <div style="font-size:13px;font-weight:700">assigned requests</div>
+      <div style="font-size:11px;color:var(--mu)">${pct}% done rate (all-time)</div>
+    </div>
+    <div style="margin-left:auto;font-size:22px;font-weight:800;color:${col}">${pct}%</div>
+  </div>
+  <div class="pbar" style="margin:0 0 12px"><div class="pfill" style="width:${pct}%;background:${col}"></div></div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px">
+    <div style="background:#dcfce7;border-radius:var(--rs);padding:10px;text-align:center">
+      <div style="font-size:22px;font-weight:800;color:#16a34a">${a.done}</div>
+      <div style="font-size:10px;color:#16a34a;font-weight:600">DONE</div>
+    </div>
+    <div style="background:#fee2e2;border-radius:var(--rs);padding:10px;text-align:center">
+      <div style="font-size:22px;font-weight:800;color:#dc2626">${a.rejected||0}</div>
+      <div style="font-size:10px;color:#dc2626;font-weight:600">REJECTED</div>
+    </div>
+    <div style="background:#ede9fe;border-radius:var(--rs);padding:10px;text-align:center">
+      <div style="font-size:22px;font-weight:800;color:#7c3aed">${a.pendingRegional||0}</div>
+      <div style="font-size:10px;color:#7c3aed;font-weight:600">PEND. REGIONAL</div>
+    </div>
+    <div style="background:#fef9c3;border-radius:var(--rs);padding:10px;text-align:center">
+      <div style="font-size:22px;font-weight:800;color:#ca8a04">${a.pendingContent||0}</div>
+      <div style="font-size:10px;color:#ca8a04;font-weight:600">PEND. CONTENT</div>
+    </div>
+    ${a.cancelled>0?`<div style="background:var(--bg2);border-radius:var(--rs);padding:10px;text-align:center;border:1px solid var(--bor)">
+      <div style="font-size:22px;font-weight:800;color:var(--mu)">${a.cancelled}</div>
+      <div style="font-size:10px;color:var(--mu);font-weight:600">CANCELLED</div>
+    </div>`:''}
+  </div>
+  ${!a.total?'<div style="color:var(--mu);font-size:11px;margin-top:8px">No requests found for this agent.</div>':''}`;
+}
+
 // ═══ MANAGER: OVERVIEW ═════════════════════════════════════════════════════
 function renderOverview(){
   setOvLoading(false);
@@ -977,22 +1386,46 @@ function renderOverview(){
   document.getElementById('pfill').style.width=pct+'%';
   document.getElementById('pdet').textContent=`${pct}% finish rate · ${pend} pending · ${pfb} pending feedback · ${rej} rejected`;
 
-  const lb=TEAM.map(o=>({o,n:finished.filter(r=>r.owner===o).length,sku:R.filter(r=>r.owner===o).reduce((s,r)=>s+(r.skuAdded||0),0)})).sort((a,b)=>b.n-a.n);
+  const todayOv=todayISO();
+  const yesterdayOv=_isoAdd(todayOv,-1);
+  const lb=TEAM.map(o=>{
+    const n=finished.filter(r=>r.owner===o).length;
+    const sku=R.filter(r=>r.owner===o).reduce((s,r)=>s+(r.skuAdded||0),0);
+    const yestN=R.filter(r=>isFinished(r)&&r.endISO===yesterdayOv&&r.owner===o).length;
+    return {o,n,sku,yestN};
+  }).sort((a,b)=>b.n-a.n);
   const mx=lb[0]?.n||1;
-  document.getElementById('lb').innerHTML=lb.map(e=>`
-    <div class="lrow">
+  document.getElementById('lb').innerHTML=lb.map(e=>{
+    const deltaHtml=e.yestN>0?`<span style="font-size:10px;color:var(--gr);min-width:38px;text-align:right">▲${e.yestN} yest</span>`:'<span style="font-size:10px;color:var(--mu);min-width:38px;text-align:right">—</span>';
+    return `<div class="lrow">
       <div class="av" style="background:${COLORS[e.o]};width:30px;height:30px">${ini(e.o)}</div>
       <div class="lname">${e.o}</div>
       <div><div class="lbar"><div class="lbf" style="width:${Math.round(e.n/mx*100)}%"></div></div></div>
       <div class="lcount">${e.n.toLocaleString()}</div>
+      ${deltaHtml}
       <div style="font-size:10px;color:var(--bl);min-width:50px;text-align:right" title="SKU added">+${e.sku.toLocaleString()} SKU</div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 
+  const rejRows=R.filter(r=>r.status==='Rejected');
+  const nowMs=new Date(todayOv).getTime();
+  const rejAging={lt3:0,d3_7:0,gt7:0};
+  rejRows.forEach(r=>{const d=r.startISO;if(!d)return;const age=Math.floor((nowMs-new Date(d).getTime())/86400000);if(age>7)rejAging.gt7++;else if(age>=3)rejAging.d3_7++;else rejAging.lt3++;});
+  const rejAlertBadge=rejAging.gt7>0?`<span style="font-size:10px;background:var(--re);color:#fff;padding:1px 6px;border-radius:10px;margin-left:6px">🚨 ${rejAging.gt7} over 7d</span>`:'';
   document.getElementById('qs').innerHTML=`
     <div class="qrow"><div class="qlbl"><span class="dot" style="background:var(--gr)"></span>Finished (has End Date)</div><div style="font-weight:700">${fin.toLocaleString()}</div></div>
     <div class="qrow"><div class="qlbl"><span class="dot" style="background:var(--ye)"></span>Pending</div><div style="font-weight:700">${pend.toLocaleString()}</div></div>
     <div class="qrow"><div class="qlbl"><span class="dot" style="background:var(--bl)"></span>Pending Feedback</div><div style="font-weight:700;color:var(--bl)">${pfb.toLocaleString()}</div></div>
-    <div class="qrow"><div class="qlbl"><span class="dot" style="background:var(--re)"></span>Rejected</div><div style="font-weight:700">${rej.toLocaleString()}</div></div>`;
+    <div class="qrow"><div class="qlbl"><span class="dot" style="background:var(--re)"></span>Rejected ${rejAlertBadge}</div><div style="font-weight:700">${rej.toLocaleString()}</div></div>
+    ${rej>0?`<div style="margin-top:8px;padding:8px;background:var(--bg2);border-radius:var(--rs);font-size:11px">
+      <div style="font-weight:600;margin-bottom:5px;color:var(--mu)">Rejected aging</div>
+      <div style="display:flex;gap:8px">
+        <span style="background:#dcfce7;color:#16a34a;padding:2px 8px;border-radius:10px">✅ &lt;3d: ${rejAging.lt3}</span>
+        <span style="background:#fef9c3;color:#ca8a04;padding:2px 8px;border-radius:10px">⚠️ 3-7d: ${rejAging.d3_7}</span>
+        <span style="background:#fee2e2;color:#dc2626;padding:2px 8px;border-radius:10px">🚨 &gt;7d: ${rejAging.gt7}</span>
+      </div>
+    </div>`:''}
+  `;
 
   const today=todayISO();
   const day=new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'});
@@ -1015,6 +1448,7 @@ function renderOverview(){
   const dp=document.getElementById('ov-day');
   if(dp&&!dp.value) dp.value=today;
   renderDailyProgress();
+  renderMRSection();
 }
 
 // ─── attendance + target helpers ───────────────────────────────────────────
@@ -1232,30 +1666,77 @@ function renderDD(){
   const caseRows=eR.sort((a,b)=>(b.endISO||'').localeCompare(a.endISO||'')).slice(0,200);
   html+=`<div class="card" style="margin-bottom:14px"><div class="sh"><div class="stit">Case Breakdown — ${emp}</div><div style="font-size:12px;color:var(--mu)">${eR.length} total rows</div></div><div style="overflow:auto"><table><thead><tr><th>End Date</th><th>Case #</th><th>Vendor</th><th>Type</th><th>Status</th><th>Days</th><th>Comment</th></tr></thead><tbody>${caseRows.map(r=>{const bc=r.status==='Done'?'bd':r.status==='Rejected'?'br':r.status==='Pending Feedback'?'bb':'bp';const days=(r.startISO&&r.endISO)?Math.round((new Date(r.endISO)-new Date(r.startISO))/(86400000)):'—';return`<tr><td style="font-weight:600">${r.endISO||'—'}</td><td style="color:var(--mu)">${r.caseNo||'—'}</td><td>${r.vendor||'—'}</td><td style="color:var(--mu)">${r.caseType||'—'}</td><td><span class="badge ${bc}">${r.status||'—'}</span></td><td style="color:${typeof days==='number'?(days<=3?'var(--gr)':days<=7?'var(--ye)':'var(--re)'):'var(--mu)'};font-weight:${typeof days==='number'?700:400}">${days}</td><td style="color:var(--mu);font-size:11px;max-width:160px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${r.comment}">${r.comment||'—'}</td></tr>`;}).join('')}</tbody></table></div></div>`;
 
+  // Main Requests section
+  html+=`<div class="card" style="margin-bottom:14px">
+    <div class="sh" style="margin-bottom:10px">
+      <div>
+        <div class="stit">📋 Main Requests — This Month</div>
+        <div style="font-size:11px;color:var(--mu);margin-top:2px">Requests tracked from Main Request sheet for ${emp}</div>
+      </div>
+    </div>
+    <div id="mr-agent-section"><div style="color:var(--mu);font-size:12px">Loading…</div></div>
+  </div>`;
+
   // Q4: Google Drive Case Files
   html+=`<div class="card" style="margin-bottom:14px" id="dd-drive-wrap">
     <div class="sh" style="margin-bottom:12px">
-      <div><div class="stit">📁 Google Drive — Case Files</div><div style="font-size:11px;color:var(--mu);margin-top:2px">Link Drive files to any case number</div></div>
-      <a href="https://drive.google.com/drive/folders/16UhJIyxDXa8Y9Allnot1lvKB57W5Dy49" target="_blank" class="btn" style="font-size:11px;text-decoration:none">Open Drive Folder ↗</a>
+      <div><div class="stit">📁 Google Drive — Case Files</div><div style="font-size:11px;color:var(--mu);margin-top:2px">Browse raw data folders · search by case number · link files to cases</div></div>
+      <a href="https://drive.google.com/drive/folders/16UhJIyxDXa8Y9Allnot1lvKB57W5Dy49" target="_blank" class="btn" style="font-size:11px;text-decoration:none">Open in Drive ↗</a>
     </div>
-    <!-- Link a file to a case -->
-    <div style="background:var(--sur2);border-radius:var(--rs);padding:12px;margin-bottom:14px">
-      <div style="font-size:12px;font-weight:700;margin-bottom:10px">➕ Link a Drive File to a Case</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
-        <div class="fg"><label class="fl">Case Number</label><input type="text" id="drive-case-no" placeholder="e.g. 00123456"/></div>
-        <div class="fg"><label class="fl">Search Drive for this case</label><button class="btn btnp" style="width:100%;margin-top:2px" onclick="searchDriveCase()">🔍 Search Files</button></div>
+
+    <!-- Drive Tabs -->
+    <div style="display:flex;gap:0;border-bottom:1px solid var(--bor);margin-bottom:14px">
+      <button id="drtab-browse" class="stab on" style="font-size:11px" onclick="switchDriveTab('browse','${emp}')">📂 Browse Folder</button>
+      <button id="drtab-search" class="stab" style="font-size:11px" onclick="switchDriveTab('search','${emp}')">🔍 Search by Case #</button>
+      <button id="drtab-linked" class="stab" style="font-size:11px" onclick="switchDriveTab('linked','${emp}')">🔗 Linked Files</button>
+    </div>
+
+    <!-- Browse Tab -->
+    <div id="drtab-browse-body">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap" id="drive-breadcrumb">
+        <span style="font-size:11px;color:var(--mu)">Loading…</span>
       </div>
-      <div id="drive-search-results" style="display:none;background:var(--bg);border:1px solid var(--bor);border-radius:var(--rs);padding:8px;margin-bottom:8px;max-height:180px;overflow-y:auto"></div>
-      <div style="font-size:11px;color:var(--di);margin-bottom:8px">— or paste a Drive link manually —</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:end">
-        <div class="fg"><label class="fl">File Name</label><input type="text" id="drive-file-name" placeholder="e.g. Vendor Content Sheet"/></div>
-        <div class="fg"><label class="fl">Drive URL</label><input type="text" id="drive-file-url" placeholder="https://drive.google.com/..."/></div>
-        <button class="btn btnp" style="height:34px" onclick="saveDriveLink('${emp}')">Save Link</button>
+      <div id="drive-browser-body">
+        <div style="color:var(--mu);font-size:13px;text-align:center;padding:20px"><div class="spin" style="margin:0 auto 8px"></div>Loading folder contents…</div>
       </div>
+      <!-- Quick-link panel shown when a file is selected from browser -->
+      <div id="drive-browser-link-panel" style="display:none;margin-top:12px;background:var(--sur2);border-radius:var(--rs);padding:10px">
+        <div style="font-size:12px;font-weight:700;margin-bottom:8px">📎 Link this file to a case</div>
+        <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
+          <div class="fg" style="min-width:140px"><label class="fl">Case Number</label><input type="text" id="drive-blink-caseno" placeholder="e.g. 00123456"/></div>
+          <div class="fg" style="flex:1"><label class="fl">File</label><input type="text" id="drive-blink-name" readonly style="background:var(--bg)"/></div>
+          <input type="hidden" id="drive-blink-url"/>
+          <button class="btn btnp" style="height:34px" onclick="saveDriveLinkFromBrowser('${emp}')">Save Link</button>
+          <button class="btn" style="height:34px" onclick="document.getElementById('drive-browser-link-panel').style.display='none'">✕</button>
+        </div>
+        <span id="drive-blink-status" style="font-size:11px;color:var(--mu);display:block;margin-top:4px"></span>
+      </div>
+    </div>
+
+    <!-- Search Tab -->
+    <div id="drtab-search-body" style="display:none">
+      <div style="display:flex;gap:8px;margin-bottom:10px">
+        <input type="text" id="drive-case-no" placeholder="Case number e.g. 00123456" style="flex:1" onkeydown="if(event.key==='Enter')searchDriveCase()"/>
+        <button class="btn btnp" onclick="searchDriveCase()">🔍 Search</button>
+      </div>
+      <div id="drive-search-results"><div style="color:var(--mu);font-size:12px">Enter a case number and click Search</div></div>
+      <!-- Manual paste fallback -->
+      <details style="margin-top:12px">
+        <summary style="font-size:11px;color:var(--di);cursor:pointer">📋 Paste a Drive link manually</summary>
+        <div style="margin-top:8px;display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:end">
+          <div class="fg"><label class="fl">Case #</label><input type="text" id="drive-manual-caseno" placeholder="00123456"/></div>
+          <div class="fg"><label class="fl">File Name</label><input type="text" id="drive-file-name" placeholder="Vendor Content Sheet"/></div>
+          <div class="fg"><label class="fl">Drive URL</label><input type="text" id="drive-file-url" placeholder="https://drive.google.com/…"/></div>
+          <button class="btn btnp" style="height:34px" onclick="saveDriveLinkManual('${emp}')">Save</button>
+        </div>
+      </details>
       <span id="drive-link-status" style="font-size:11px;color:var(--mu);margin-top:6px;display:block"></span>
     </div>
-    <!-- Existing linked files -->
-    <div id="dd-drive-files"><div style="color:var(--mu);font-size:13px">Loading linked files…</div></div>
+
+    <!-- Linked Files Tab -->
+    <div id="drtab-linked-body" style="display:none">
+      <div id="dd-drive-files"><div style="color:var(--mu);font-size:13px">Loading linked files…</div></div>
+    </div>
   </div>`;
 
   // Q2: Notes section (manager view — can add + mark done)
@@ -1275,47 +1756,186 @@ function renderDD(){
 
   el.innerHTML=html;
   loadNotesForDD(emp);
-  loadDriveLinks(emp);
+  _driveCurrentEmp=emp;
+  switchDriveTab('browse', emp);
+  renderMRAgentSection(emp);
 }
 
 // ── Google Drive case-file functions ─────────────────────────────────────────
+let _driveCurrentEmp = '';
+let _driveBreadcrumb = []; // [{id, name}]
+
+function switchDriveTab(tab, emp) {
+  ['browse','search','linked'].forEach(function(t) {
+    const btn  = document.getElementById('drtab-'+t);
+    const body = document.getElementById('drtab-'+t+'-body');
+    if (btn)  btn.classList.toggle('on', t===tab);
+    if (body) body.style.display = (t===tab) ? '' : 'none';
+  });
+  if (tab === 'browse')  { if (!_driveCurrentEmp || _driveCurrentEmp !== emp) { _driveBreadcrumb=[]; } _driveCurrentEmp=emp; browseFolder('16UhJIyxDXa8Y9Allnot1lvKB57W5Dy49', 'Raw Data', true); }
+  if (tab === 'linked')  loadDriveLinks(emp);
+}
+
+function _driveFileIcon(mime) {
+  if (!mime) return '📄';
+  if (mime === 'application/vnd.google-apps.folder') return '📂';
+  if (mime.includes('spreadsheet') || mime.includes('excel')) return '📊';
+  if (mime.includes('document') || mime.includes('word')) return '📝';
+  if (mime.includes('pdf')) return '📕';
+  if (mime.includes('image')) return '🖼️';
+  if (mime.includes('video')) return '🎬';
+  if (mime.includes('presentation') || mime.includes('powerpoint')) return '📋';
+  return '📄';
+}
+
+function browseFolder(folderId, folderName, isRoot) {
+  const bc   = document.getElementById('drive-breadcrumb');
+  const body = document.getElementById('drive-browser-body');
+  if (!bc || !body) return;
+
+  // Update breadcrumb state
+  if (isRoot) {
+    _driveBreadcrumb = [{ id: folderId, name: '📁 Raw Data' }];
+  } else {
+    const existIdx = _driveBreadcrumb.findIndex(function(b) { return b.id === folderId; });
+    if (existIdx >= 0) {
+      _driveBreadcrumb = _driveBreadcrumb.slice(0, existIdx + 1);
+    } else {
+      _driveBreadcrumb.push({ id: folderId, name: folderName });
+    }
+  }
+
+  bc.innerHTML = _driveBreadcrumb.map(function(b, i) {
+    const isLast = i === _driveBreadcrumb.length - 1;
+    return isLast
+      ? `<span style="font-size:11px;font-weight:700;color:var(--tx)">${b.name}</span>`
+      : `<button class="btn" style="font-size:10px;padding:2px 7px" onclick="browseFolder('${b.id}','${b.name.replace(/'/g,"\\'")}',false)">${b.name}</button><span style="color:var(--di)">›</span>`;
+  }).join('');
+
+  body.innerHTML = '<div style="text-align:center;padding:24px"><div class="spin" style="margin:0 auto 8px"></div><div style="font-size:12px;color:var(--mu)">Loading…</div></div>';
+
+  google.script.run
+    .withSuccessHandler(function(result) {
+      if (!result || result.error) {
+        body.innerHTML = `<div style="color:var(--re);font-size:12px;padding:10px">Error loading folder: ${result ? result.error : 'Unknown error'}</div>`;
+        return;
+      }
+      const items = result.items || [];
+      if (!items.length) {
+        body.innerHTML = '<div style="color:var(--mu);font-size:12px;padding:10px;text-align:center">This folder is empty</div>';
+        return;
+      }
+      const folders = items.filter(function(i) { return i.isFolder; });
+      const files   = items.filter(function(i) { return !i.isFolder; });
+
+      let html = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px">';
+      // Folders first
+      folders.forEach(function(f) {
+        html += `<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--sur2);border-radius:var(--rs);cursor:pointer;border:1px solid transparent;transition:border .15s"
+          onmouseover="this.style.borderColor='var(--or)'" onmouseout="this.style.borderColor='transparent'"
+          onclick="browseFolder('${f.id}','${f.name.replace(/'/g,"\\'")}',false)">
+          <span style="font-size:20px">📂</span>
+          <div style="min-width:0">
+            <div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${f.name}">${f.name}</div>
+            <div style="font-size:9px;color:var(--di)">Folder · click to open</div>
+          </div>
+        </div>`;
+      });
+      // Files
+      files.forEach(function(f) {
+        const icon = _driveFileIcon(f.mimeType);
+        html += `<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg2);border-radius:var(--rs);border:1px solid var(--bor)">
+          <span style="font-size:18px;flex-shrink:0">${icon}</span>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:11px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${f.name}">${f.name}</div>
+            <div style="font-size:9px;color:var(--di)">${f.modified||''} ${f.size?'· '+f.size:''}</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:3px;flex-shrink:0">
+            <a href="${f.url}" target="_blank" class="btn" style="font-size:9px;padding:2px 6px;text-decoration:none">↗ Open</a>
+            <button class="btn" style="font-size:9px;padding:2px 6px" onclick="pickDriveFile('${f.name.replace(/'/g,"\\'")}','${f.url}')">📎 Link</button>
+          </div>
+        </div>`;
+      });
+      html += '</div>';
+      if (files.length || folders.length) {
+        html += `<div style="font-size:10px;color:var(--di);margin-top:8px;text-align:right">${folders.length} folder${folders.length!==1?'s':''} · ${files.length} file${files.length!==1?'s':''}</div>`;
+      }
+      body.innerHTML = html;
+    })
+    .withFailureHandler(function(e) {
+      body.innerHTML = `<div style="color:var(--re);font-size:12px;padding:10px">Failed to load: ${e.message||e}</div>`;
+    })
+    .browseDriveFolder(folderId);
+}
+
+function pickDriveFile(name, url) {
+  const panel = document.getElementById('drive-browser-link-panel');
+  if (!panel) return;
+  document.getElementById('drive-blink-name').value = name;
+  document.getElementById('drive-blink-url').value  = url;
+  document.getElementById('drive-blink-status').textContent = '';
+  panel.style.display = '';
+  const inp = document.getElementById('drive-blink-caseno');
+  if (inp) inp.focus();
+}
+
+function saveDriveLinkFromBrowser(emp) {
+  const caseNo = (document.getElementById('drive-blink-caseno').value||'').trim();
+  const name   = (document.getElementById('drive-blink-name').value||'').trim();
+  const url    = (document.getElementById('drive-blink-url').value||'').trim();
+  const st     = document.getElementById('drive-blink-status');
+  if (!caseNo || !name || !url) { alert('Enter a case number first.'); return; }
+  st.textContent = 'Saving…'; st.style.color = 'var(--mu)';
+  google.script.run
+    .withSuccessHandler(function() {
+      st.textContent = '✅ Linked to case #' + caseNo; st.style.color = 'var(--gr)';
+      document.getElementById('drive-blink-caseno').value = '';
+      setTimeout(function() { document.getElementById('drive-browser-link-panel').style.display='none'; }, 1800);
+    })
+    .withFailureHandler(function(e) { st.textContent = '❌ ' + (e.message||e); st.style.color = 'var(--re)'; })
+    .saveCaseDriveLink(emp, caseNo, name, url);
+}
+
 function searchDriveCase() {
   const caseNo = (document.getElementById('drive-case-no').value||'').trim();
   if (!caseNo) { alert('Enter a case number first.'); return; }
   const res = document.getElementById('drive-search-results');
-  res.style.display = 'block';
-  res.innerHTML = '<span style="color:var(--mu);font-size:12px">Searching Drive…</span>';
+  res.innerHTML = '<div style="text-align:center;padding:16px"><div class="spin" style="margin:0 auto 8px"></div><div style="font-size:12px;color:var(--mu)">Searching all Drive folders…</div></div>';
   google.script.run
     .withSuccessHandler(function(files) {
       if (!files || !files.length) {
-        res.innerHTML = '<span style="color:var(--di);font-size:12px">No files found matching that case number.</span>';
+        res.innerHTML = '<div style="color:var(--di);font-size:12px;padding:10px;text-align:center">No files found matching "<strong>' + caseNo + '</strong>" in the Drive folder.</div>';
         return;
       }
-      res.innerHTML = files.map(f =>
-        `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--bor)">
-          <span style="font-size:13px">📄</span>
-          <div style="flex:1;min-width:0">
-            <div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${f.name}</div>
-            <div style="font-size:10px;color:var(--mu)">${f.mimeType||''}</div>
-          </div>
-          <button class="btn" style="font-size:10px;padding:3px 8px;flex-shrink:0" onclick="
-            document.getElementById('drive-file-name').value=\`${f.name.replace(/`/g,"'")}\`;
-            document.getElementById('drive-file-url').value=\`${f.url}\`;
-            document.getElementById('drive-search-results').style.display='none';
-          ">Use</button>
-          <a href="${f.url}" target="_blank" class="btn" style="font-size:10px;padding:3px 8px;text-decoration:none;flex-shrink:0">Open ↗</a>
-        </div>`
-      ).join('');
+      res.innerHTML = `<div style="font-size:11px;font-weight:700;color:var(--mu);margin-bottom:8px">${files.length} file${files.length!==1?'s':''} found</div>` +
+        files.map(function(f) {
+          const icon = _driveFileIcon(f.mimeType);
+          return `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--bor)">
+            <span style="font-size:16px;flex-shrink:0">${icon}</span>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${f.name}</div>
+              <div style="font-size:9px;color:var(--mu)">${f.mimeType||''}</div>
+            </div>
+            <a href="${f.url}" target="_blank" class="btn" style="font-size:10px;padding:3px 8px;text-decoration:none;flex-shrink:0">↗ Open</a>
+            <button class="btn btnp" style="font-size:10px;padding:3px 8px;flex-shrink:0" onclick="switchDriveTab('search','${_driveCurrentEmp}');pickFileToLink('${f.name.replace(/'/g,"\\'")}','${f.url}','${caseNo}')">📎 Link</button>
+          </div>`;
+        }).join('');
     })
-    .withFailureHandler(function(e) { res.innerHTML = `<span style="color:var(--re);font-size:12px">Error: ${e.message||e}</span>`; })
+    .withFailureHandler(function(e) { res.innerHTML = `<div style="color:var(--re);font-size:12px;padding:10px">Error: ${e.message||e}</div>`; })
     .searchDriveForCase(caseNo);
 }
 
-function saveDriveLink(emp) {
-  const caseNo  = (document.getElementById('drive-case-no').value||'').trim();
-  const name    = (document.getElementById('drive-file-name').value||'').trim();
-  const url     = (document.getElementById('drive-file-url').value||'').trim();
-  const st      = document.getElementById('drive-link-status');
+function pickFileToLink(name, url, caseNo) {
+  document.getElementById('drive-manual-caseno').value = caseNo || '';
+  document.getElementById('drive-file-name').value = name;
+  document.getElementById('drive-file-url').value  = url;
+}
+
+function saveDriveLinkManual(emp) {
+  const caseNo = (document.getElementById('drive-manual-caseno').value||document.getElementById('drive-case-no').value||'').trim();
+  const name   = (document.getElementById('drive-file-name').value||'').trim();
+  const url    = (document.getElementById('drive-file-url').value||'').trim();
+  const st     = document.getElementById('drive-link-status');
   if (!caseNo || !name || !url) { alert('Fill in case number, file name, and URL.'); return; }
   st.textContent = 'Saving…'; st.style.color = 'var(--mu)';
   google.script.run
@@ -1323,35 +1943,43 @@ function saveDriveLink(emp) {
       st.textContent = '✅ Linked!'; st.style.color = 'var(--gr)';
       document.getElementById('drive-file-name').value = '';
       document.getElementById('drive-file-url').value  = '';
-      loadDriveLinks(emp);
     })
     .withFailureHandler(function(e) { st.textContent = '❌ ' + (e.message||e); st.style.color = 'var(--re)'; })
     .saveCaseDriveLink(emp, caseNo, name, url);
 }
 
+// Keep old name for backward compat (called from Deep Dive init)
+function saveDriveLink(emp) { saveDriveLinkManual(emp); }
+
 function loadDriveLinks(emp) {
   const el = document.getElementById('dd-drive-files');
   if (!el) return;
+  el.innerHTML = '<div style="color:var(--mu);font-size:13px">Loading…</div>';
   google.script.run
     .withSuccessHandler(function(links) {
       if (!links || !links.length) {
-        el.innerHTML = '<div style="color:var(--mu);font-size:13px;padding:6px 0">No files linked yet. Search or paste a Drive URL above.</div>';
+        el.innerHTML = '<div style="color:var(--mu);font-size:13px;padding:10px 0">No files linked yet. Browse or search the Drive and click 📎 Link.</div>';
         return;
       }
-      // Group by case number
       const byCase = {};
       links.forEach(function(l) { if (!byCase[l.caseNo]) byCase[l.caseNo] = []; byCase[l.caseNo].push(l); });
       el.innerHTML = Object.keys(byCase).sort().map(function(cn) {
         return `<div style="margin-bottom:12px">
-          <div style="font-size:11px;font-weight:700;color:var(--mu);margin-bottom:6px">Case #${cn}</div>
-          ${byCase[cn].map(function(l) { return `<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:var(--sur2);border-radius:var(--rs);margin-bottom:4px">
-            <span style="font-size:14px">📄</span>
-            <div style="flex:1;min-width:0">
-              <a href="${l.url}" target="_blank" style="font-size:12px;font-weight:600;color:var(--bl);text-decoration:none">${l.fileName}</a>
-              <div style="font-size:10px;color:var(--di)">${l.linkedAt ? new Date(l.linkedAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : ''}</div>
-            </div>
-            <button class="btn" style="font-size:10px;padding:2px 7px;color:var(--re)" onclick="removeDriveLink('${emp}','${l.id}')">✕</button>
-          </div>`; }).join('')}
+          <div style="font-size:11px;font-weight:700;color:var(--mu);margin-bottom:6px;display:flex;align-items:center;gap:6px">
+            <span>Case #${cn}</span>
+            <span style="font-size:9px;background:var(--bl2);color:var(--bl);padding:1px 6px;border-radius:10px">${byCase[cn].length} file${byCase[cn].length!==1?'s':''}</span>
+          </div>
+          ${byCase[cn].map(function(l) {
+            const icon = l.fileName && l.fileName.match(/\.pdf/i) ? '📕' : l.fileName && l.fileName.match(/\.xlsx?|sheet/i) ? '📊' : '📄';
+            return `<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--sur2);border-radius:var(--rs);margin-bottom:4px">
+              <span style="font-size:14px">${icon}</span>
+              <div style="flex:1;min-width:0">
+                <a href="${l.url}" target="_blank" style="font-size:12px;font-weight:600;color:var(--bl);text-decoration:none">${l.fileName}</a>
+                <div style="font-size:9px;color:var(--di)">${l.linkedAt ? new Date(l.linkedAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : ''}</div>
+              </div>
+              <button class="btn" style="font-size:10px;padding:2px 7px;color:var(--re)" onclick="removeDriveLink('${emp}','${l.id}')">✕</button>
+            </div>`;
+          }).join('')}
         </div>`;
       }).join('');
     })
@@ -1439,33 +2067,55 @@ function renderAgentOverview(){
   document.getElementById('agt-day-lbl').textContent=`📅 ${day}`;
 
   // Team grid today
+  const wkRange = isoWeekOf(0);
+  const yesterday = _isoAdd(today, -1);
   const grid=TEAM.map(o=>{
     const n=R.filter(r=>isFinished(r)&&r.endISO===today&&r.owner===o).length;
-    const pct=Math.min(Math.round(n/TARGET*100),100);
-    const col=n>=TARGET?'var(--gr)':n>0?'var(--or)':'var(--di)';
+    const dgt=getAgentTarget(o,today);
+    const pct=Math.min(Math.round(n/dgt*100),100);
+    const col=n>=dgt?'var(--gr)':n>0?'var(--or)':'var(--di)';
     const isMe=o===USER.agentName;
+    const isProj=(AGENT_MODES[o]||{}).mode==='project';
+    const weekN=R.filter(r=>isFinished(r)&&r.endISO>=wkRange.start&&r.endISO<=wkRange.end&&r.owner===o).length;
+    const weekTgt=dgt*5;
+    const weekPct=Math.min(Math.round(weekN/weekTgt*100),100);
+    const weekCol=weekN>=weekTgt?'var(--gr)':weekN>0?'var(--or)':'var(--di)';
     return `<div class="card csm" style="${isMe?'border-color:var(--or)':''}">
       ${isMe?'<div style="font-size:10px;font-weight:700;color:var(--or);margin-bottom:6px">⭐ YOU</div>':''}
       <div style="display:flex;align-items:center;gap:7px;margin-bottom:8px"><div class="av" style="background:${COLORS[o]};width:28px;height:28px;font-size:10px">${ini(o)}</div><div style="font-size:12px;font-weight:600">${o.split(' ')[0]}</div></div>
-      <div style="font-size:28px;font-weight:800;color:${col}">${n}</div>
-      <div style="font-size:11px;color:var(--mu);margin:2px 0 6px">of ${TARGET} target</div>
-      <div class="pbar" style="margin:0 0 5px"><div class="pfill" style="width:${pct}%;background:${n>=TARGET?'var(--gr)':'var(--or)'}"></div></div>
+      ${isProj
+        ? `<div style="font-size:22px;font-weight:800;color:var(--or)">${n}</div><div style="font-size:10px;color:var(--mu);margin:2px 0 5px">cases today · 🚀 On Project</div>`
+        : `<div style="font-size:28px;font-weight:800;color:${col}">${n}</div>
+           <div style="font-size:11px;color:var(--mu);margin:2px 0 4px">of ${dgt} today</div>
+           <div class="pbar" style="margin:0 0 6px"><div class="pfill" style="width:${pct}%;background:${n>=dgt?'var(--gr)':'var(--or)'}"></div></div>
+           <div style="font-size:10px;color:var(--mu);margin-bottom:3px">Week: <strong style="color:${weekCol}">${weekN}</strong> / ${weekTgt}</div>
+           <div class="pbar" style="margin:0;height:3px"><div class="pfill" style="width:${weekPct}%;background:${weekCol};height:3px"></div></div>`
+      }
     </div>`;
   });
   document.getElementById('agt-team-grid').innerHTML=grid.join('');
 
   // All-time leaderboard (finished cases)
   const finished=R.filter(isFinished);
-  const lb=TEAM.map(o=>({o,n:finished.filter(r=>r.owner===o).length,sku:R.filter(r=>r.owner===o).reduce((s,r)=>s+(r.skuAdded||0),0)})).sort((a,b)=>b.n-a.n);
-  const mx=lb[0]?.n||1;
-  document.getElementById('agt-lb').innerHTML=lb.map(e=>`
-    <div class="lrow" style="${e.o===USER.agentName?'background:var(--or2);border-radius:var(--rs);padding:10px':''}">
+  const agtYesterday=_isoAdd(today,-1);
+  const lbAgt=TEAM.map(o=>{
+    const n=finished.filter(r=>r.owner===o).length;
+    const sku=R.filter(r=>r.owner===o).reduce((s,r)=>s+(r.skuAdded||0),0);
+    const yestN=R.filter(r=>isFinished(r)&&r.endISO===agtYesterday&&r.owner===o).length;
+    return {o,n,sku,yestN};
+  }).sort((a,b)=>b.n-a.n);
+  const mx=lbAgt[0]?.n||1;
+  document.getElementById('agt-lb').innerHTML=lbAgt.map(e=>{
+    const deltaHtml=e.yestN>0?`<span style="font-size:10px;color:var(--gr);min-width:38px;text-align:right">▲${e.yestN} yest</span>`:'<span style="font-size:10px;color:var(--mu);min-width:38px;text-align:right">—</span>';
+    return `<div class="lrow" style="${e.o===USER.agentName?'background:var(--or2);border-radius:var(--rs);padding:10px':''}">
       <div class="av" style="background:${COLORS[e.o]};width:30px;height:30px">${ini(e.o)}</div>
       <div class="lname">${e.o}${e.o===USER.agentName?' <span style="font-size:9px;background:var(--or);color:#fff;padding:1px 5px;border-radius:3px">YOU</span>':''}</div>
       <div><div class="lbar"><div class="lbf" style="width:${Math.round(e.n/mx*100)}%"></div></div></div>
       <div class="lcount">${e.n.toLocaleString()}</div>
+      ${deltaHtml}
       <div style="font-size:10px;color:var(--bl);min-width:50px;text-align:right">+${e.sku.toLocaleString()} SKU</div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 
   const pend=R.filter(r=>r.status==='Pending').length;
   const pfb=R.filter(r=>r.status==='Pending Feedback').length;
@@ -1752,6 +2402,41 @@ function renderKPI(){
 }
 
 // ═══ CASE LOOKUP — Drive + Sheet ═══════════════════════════════════════════
+function renderPendingTracker(){
+  const el=document.getElementById('pending-tracker');
+  if(!el)return;
+  const todayMs=new Date(todayISO()).getTime();
+  const rows=R.filter(r=>r.status==='Pending'||r.status==='Pending Feedback').map(r=>{
+    const age=r.startISO?Math.floor((todayMs-new Date(r.startISO).getTime())/86400000):null;
+    return {owner:r.owner||'—',caseNo:r.caseNo||r['Case No']||'—',vendor:r.vendor||r['Vendor']||'—',status:r.status,age};
+  }).sort((a,b)=>(b.age||0)-(a.age||0));
+  if(!rows.length){el.innerHTML='<div style="color:var(--mu);font-size:13px;text-align:center;padding:20px">No pending cases — great job! 🎉</div>';return;}
+  const ageBadge=(age,status)=>{
+    if(age===null)return '<span style="color:var(--mu)">—</span>';
+    const col=age>7?'#dc2626':age>=3?'#ca8a04':'#16a34a';
+    const bg=age>7?'#fee2e2':age>=3?'#fef9c3':'#dcfce7';
+    const icon=age>7?'🚨':age>=3?'⚠️':'✅';
+    return `<span style="background:${bg};color:${col};padding:2px 7px;border-radius:10px;font-size:11px">${icon} ${age}d</span>`;
+  };
+  const stCol=s=>s==='Pending Feedback'?'var(--bl)':'var(--ye)';
+  el.innerHTML=`<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">
+    <thead><tr style="background:var(--bg2)">
+      <th style="padding:7px 10px;text-align:left">Agent</th>
+      <th style="padding:7px 10px;text-align:left">Case #</th>
+      <th style="padding:7px 10px;text-align:left">Vendor</th>
+      <th style="padding:7px 10px;text-align:left">Status</th>
+      <th style="padding:7px 10px;text-align:left">Days Pending</th>
+    </tr></thead>
+    <tbody>${rows.map((r,i)=>`<tr style="background:${i%2?'var(--bg2)':'transparent'}">
+      <td style="padding:6px 10px"><span class="av" style="background:${COLORS[r.owner]||'#888'};width:22px;height:22px;font-size:9px;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;color:#fff;margin-right:5px">${ini(r.owner)}</span>${r.owner}</td>
+      <td style="padding:6px 10px;font-family:monospace;font-weight:600">${r.caseNo}</td>
+      <td style="padding:6px 10px">${r.vendor}</td>
+      <td style="padding:6px 10px"><span style="color:${stCol(r.status)};font-weight:600">${r.status}</span></td>
+      <td style="padding:6px 10px">${ageBadge(r.age,r.status)}</td>
+    </tr>`).join('')}</tbody>
+  </table></div><div style="font-size:11px;color:var(--mu);margin-top:8px">${rows.length} pending cases total · sorted oldest first</div>`;
+}
+
 function runCaseLookup(){
   const q=document.getElementById('cl-input').value.trim();
   if(!q){alert('Enter a case number first.');return;}
@@ -1931,11 +2616,19 @@ function loadSettings(){
       cfgs.forEach(function(c){ PROJECT_CONFIGS[c.projectName]=c; });
     })
     .getProjectConfigs();
+
+  // Monthly SKU targets
+  google.script.run
+    .withSuccessHandler(function(data){
+      if(!data) return;
+      SKU_TARGETS = data;
+    })
+    .getSkuTargets();
 }
 
 // ═══ SETTINGS PAGE — TABS ══════════════════════════════════════════════════
 function switchSettingsTab(tab){
-  ['targets','attendance','sla','config'].forEach(function(t){
+  ['targets','attendance','sla','config','whatsapp'].forEach(function(t){
     const btn=document.getElementById('stab-'+t);
     const body=document.getElementById('stab-'+t+'-body');
     if(btn)  btn.classList.toggle('on', t===tab);
@@ -1943,6 +2636,7 @@ function switchSettingsTab(tab){
   });
   if(tab==='targets')    renderTargetsTable();
   if(tab==='attendance') loadAttendanceCal();
+  if(tab==='whatsapp')   loadWaConfig();
   if(tab==='sla'){
     // Populate case type datalist from real sheet data
     const dl=document.getElementById('sla-type-list');
@@ -2039,6 +2733,231 @@ function renderTargetsTable(){
     </div>
   </div>`;
   document.getElementById('targets-table').innerHTML=html;
+
+  // SKU Targets section
+  const skuEl=document.getElementById('sku-targets-section');
+  if(skuEl){
+    const skuM=todayISO().slice(0,7);
+    let skuHtml=`<div class="card"><div class="sh" style="margin-bottom:12px"><div><div class="stit">📦 Monthly SKU Targets</div><div style="font-size:11px;color:var(--mu)">SKU added this month vs monthly target per agent</div></div></div><table><thead><tr><th>Agent</th><th>This Month Target (SKU)</th><th>SKU Added So Far</th><th></th></tr></thead><tbody>`;
+    TEAM.forEach(function(agent){
+      const k='sku_'+agent.replace(/ /g,'_');
+      const skuTgt=(SKU_TARGETS[agent]&&SKU_TARGETS[agent][skuM])||0;
+      const skuDone=R.filter(r=>r.owner===agent&&r.endISO&&r.endISO.slice(0,7)===skuM).reduce((s,r)=>s+(r.skuAdded||0),0);
+      const skuPct=skuTgt>0?Math.min(Math.round(skuDone/skuTgt*100),100):0;
+      const skuCol=skuDone>=skuTgt&&skuTgt>0?'var(--gr)':skuDone>0?'var(--bl)':'var(--di)';
+      skuHtml+=`<tr>
+        <td><div style="display:flex;align-items:center;gap:8px"><div class="av" style="background:${COLORS[agent]};width:28px;height:28px">${ini(agent)}</div><div style="font-weight:600">${agent}</div></div></td>
+        <td><input type="number" id="${k}-tgt" value="${skuTgt||''}" min="0" max="99999" placeholder="e.g. 500" style="width:90px;text-align:center"/></td>
+        <td>
+          <div style="font-weight:700;color:${skuCol}">${skuDone.toLocaleString()} ${skuTgt>0?`<span style="font-size:10px;color:var(--mu)">/ ${skuTgt.toLocaleString()} (${skuPct}%)</span>`:''}</div>
+          ${skuTgt>0?`<div class="pbar" style="margin-top:4px;width:160px"><div class="pfill" style="width:${skuPct}%;background:${skuCol}"></div></div>`:''}
+        </td>
+        <td><button class="btn btnp" onclick="saveSkuTarget('${agent}','${skuM}')">Save</button></td>
+      </tr>`;
+    });
+    skuHtml+=`</tbody></table></div>`;
+    skuEl.innerHTML=skuHtml;
+  }
+}
+
+function saveSkuTarget(agent, month){
+  const k='sku_'+agent.replace(/ /g,'_');
+  const val=parseInt(document.getElementById(k+'-tgt').value)||0;
+  if(!SKU_TARGETS[agent]) SKU_TARGETS[agent]={};
+  SKU_TARGETS[agent][month]=val;
+  google.script.run.saveSkuTarget(agent, month, val);
+  renderTargetsTable();
+  renderOrgView();
+}
+
+// ═══ WHATSAPP ════════════════════════════════════════════════════════════════
+
+function waUpdateSteps(){
+  const phone = (document.getElementById('wa-phone').value||'').trim();
+  // Step 3 icon turns green once a group ID is entered
+  const s3 = document.getElementById('wa-step3-icon');
+  if(s3) s3.textContent = phone ? '✅' : '3️⃣';
+}
+
+function loadWaConfig(){
+  google.script.run
+    .withSuccessHandler(function(cfg){
+      if(!cfg) return;
+      if(cfg.phone)   document.getElementById('wa-phone').value   = cfg.phone;
+      if(cfg.apikey)  document.getElementById('wa-apikey').value  = cfg.apikey;
+      const enabled = cfg.scheduleEnabled === true || cfg.scheduleEnabled === 'true';
+      document.getElementById('wa-schedule-enabled').checked = enabled;
+      [1,2,3,4].forEach(function(i){
+        if(cfg['time'+i])   document.getElementById('wa-time-'+i).value = cfg['time'+i];
+        const on = cfg['time'+i+'on'] === true || cfg['time'+i+'on'] === 'true';
+        document.getElementById('wa-time-'+i+'-on').checked = on;
+      });
+      const badge = document.getElementById('wa-status-badge');
+      if(cfg.phone && cfg.apikey){
+        badge.textContent='🟢 Configured';
+        badge.style.background='var(--gr2)'; badge.style.color='var(--gr)';
+      }
+    })
+    .withFailureHandler(function(){})
+    .getWaConfig();
+}
+
+function saveWaConfig(){
+  const phone  = document.getElementById('wa-phone').value.trim();
+  const apikey = document.getElementById('wa-apikey').value.trim();
+  const st     = document.getElementById('wa-config-status');
+  if(!phone || !apikey){ st.textContent='⚠️ Fill in phone and API key first.'; st.style.color='var(--ye)'; return; }
+  st.textContent='Saving…'; st.style.color='var(--mu)';
+  const cfg = _buildWaCfg();
+  cfg.phone  = phone;
+  cfg.apikey = apikey;
+  google.script.run
+    .withSuccessHandler(function(){
+      st.textContent='✅ Saved!'; st.style.color='var(--gr)';
+      const badge=document.getElementById('wa-status-badge');
+      badge.textContent='🟢 Configured'; badge.style.background='var(--gr2)'; badge.style.color='var(--gr)';
+    })
+    .withFailureHandler(function(e){ st.textContent='❌ '+( e.message||e); st.style.color='var(--re)'; })
+    .saveWaConfig(cfg);
+}
+
+function saveWaSchedule(){
+  const cfg = _buildWaCfg();
+  const st  = document.getElementById('wa-schedule-status');
+  st.textContent='Saving schedule…'; st.style.color='var(--mu)';
+  google.script.run
+    .withSuccessHandler(function(r){
+      st.textContent = r && r.triggersSet
+        ? '✅ Schedule active — '+r.triggersSet+' trigger(s) set'
+        : '✅ Schedule saved';
+      st.style.color='var(--gr)';
+    })
+    .withFailureHandler(function(e){ st.textContent='❌ '+(e.message||e); st.style.color='var(--re)'; })
+    .saveWaConfig(cfg);
+}
+
+function _buildWaCfg(){
+  const cfg={
+    phone:  (document.getElementById('wa-phone').value||'').trim(),
+    apikey: (document.getElementById('wa-apikey').value||'').trim(),
+    scheduleEnabled: document.getElementById('wa-schedule-enabled').checked
+  };
+  [1,2,3,4].forEach(function(i){
+    cfg['time'+i]   = document.getElementById('wa-time-'+i).value;
+    cfg['time'+i+'on'] = document.getElementById('wa-time-'+i+'-on').checked;
+  });
+  return cfg;
+}
+
+function sendWaTestMessage(){
+  const phone  = document.getElementById('wa-phone').value.trim();
+  const apikey = document.getElementById('wa-apikey').value.trim();
+  const st     = document.getElementById('wa-config-status');
+  if(!phone || !apikey){ st.textContent='⚠️ Save phone and API key first.'; st.style.color='var(--ye)'; return; }
+  st.textContent='Sending test…'; st.style.color='var(--mu)';
+  google.script.run
+    .withSuccessHandler(function(r){
+      st.textContent = r && r.ok ? '✅ Test message sent!' : '❌ Failed: '+(r&&r.error||'Unknown');
+      st.style.color = r && r.ok ? 'var(--gr)' : 'var(--re)';
+    })
+    .withFailureHandler(function(e){ st.textContent='❌ '+(e.message||e); st.style.color='var(--re)'; })
+    .sendWaTest(phone, apikey);
+}
+
+function triggerWaProgressNow(){
+  const st = document.getElementById('wa-schedule-status');
+  st.textContent='Sending progress update…'; st.style.color='var(--mu)';
+  google.script.run
+    .withSuccessHandler(function(r){
+      st.textContent = r && r.ok ? '✅ Sent! Check WhatsApp.' : '❌ Failed: '+(r&&r.error||'not configured');
+      st.style.color = r && r.ok ? 'var(--gr)' : 'var(--re)';
+    })
+    .withFailureHandler(function(e){ st.textContent='❌ '+(e.message||e); st.style.color='var(--re)'; })
+    .sendWaProgressUpdate();
+}
+
+function waToggleGroupField(){
+  const isGroup = document.querySelector('input[name="wa-recipient"]:checked').value === 'group';
+  document.getElementById('wa-group-field').style.display = isGroup ? '' : 'none';
+}
+
+function saveWaGroupPhone(){
+  const v = (document.getElementById('wa-group-phone').value||'').trim();
+  // persist in memory so sendWaManual can read it
+  window._waGroupPhone = v;
+}
+
+function waLookupCase(){
+  const q = (document.getElementById('wa-lookup-case').value||'').trim();
+  const el = document.getElementById('wa-case-info');
+  if(!q || q.length < 4){ el.style.display='none'; return; }
+  const matches = R.filter(function(r){ return r.caseNo && r.caseNo.toLowerCase().indexOf(q.toLowerCase())!==-1; });
+  if(!matches.length){ el.style.display='block'; el.innerHTML='<span style="color:var(--mu)">No case found</span>'; return; }
+  const r = matches[0];
+  const age = r.startISO ? Math.floor((Date.now()-new Date(r.startISO).getTime())/86400000) : null;
+  const stCol = r.status==='Rejected'?'var(--re)':r.status==='Pending Feedback'?'var(--bl)':r.status==='Pending'?'var(--ye)':'var(--gr)';
+  el.style.display='block';
+  el.innerHTML=`<div style="display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap">
+    <div><div style="font-size:10px;color:var(--mu)">Owner</div><div style="font-weight:700">${r.owner||'—'}</div></div>
+    <div><div style="font-size:10px;color:var(--mu)">Vendor</div><div style="font-weight:700">${r.vendor||'—'}</div></div>
+    <div><div style="font-size:10px;color:var(--mu)">Status</div><div style="font-weight:700;color:${stCol}">${r.status||'—'}</div></div>
+    ${age!==null?`<div><div style="font-size:10px;color:var(--mu)">Age</div><div style="font-weight:700;color:${age>7?'var(--re)':age>3?'var(--ye)':'var(--gr)'}">${age}d</div></div>`:''}
+    <button class="btn btnp" style="font-size:10px;padding:3px 8px;margin-top:2px" onclick="waFillCaseTemplate('${r.caseNo}','${(r.owner||'').replace(/'/g,"\\'")}','${(r.vendor||'').replace(/'/g,"\\'")}','${r.status||''}','${age!==null?age:'?'}')">Use in Message</button>
+  </div>`;
+  if(matches.length>1) el.innerHTML+=`<div style="font-size:10px;color:var(--di);margin-top:5px">+${matches.length-1} more matching cases</div>`;
+}
+
+function waFillCaseTemplate(caseNo, owner, vendor, status, age){
+  const today = new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+  const isUrgent = parseInt(age)>7 || status==='Rejected';
+  const icon = isUrgent ? '🚨' : status==='Pending Feedback' ? '🔵' : '⏳';
+  const msg = `${icon} *Case Follow-up — ${today}*\n\nCase #: ${caseNo}\nVendor: ${vendor}\nOwner: ${owner}\nStatus: ${status}\nAge: ${age} day(s)\n\n📌 Action required:\n• ___\n\nPlease update and confirm. Thank you!`;
+  document.getElementById('wa-manual-msg').value = msg;
+  document.getElementById('wa-manual-msg').focus();
+}
+
+function sendWaManual(){
+  const msg = (document.getElementById('wa-manual-msg').value||'').trim();
+  const st  = document.getElementById('wa-manual-status');
+  if(!msg){ st.textContent='⚠️ Write a message first.'; st.style.color='var(--ye)'; return; }
+  const recipient = document.querySelector('input[name="wa-recipient"]:checked').value;
+  const groupPhone = (document.getElementById('wa-group-phone')&&document.getElementById('wa-group-phone').value||'').trim();
+  if(recipient==='group' && !groupPhone){ st.textContent='⚠️ Enter group phone/ID first.'; st.style.color='var(--ye)'; return; }
+  st.textContent='Sending…'; st.style.color='var(--mu)';
+  google.script.run
+    .withSuccessHandler(function(r){
+      st.textContent = r && r.ok ? '✅ Sent!' : '❌ Failed: '+(r&&r.error||'not configured');
+      st.style.color = r && r.ok ? 'var(--gr)' : 'var(--re)';
+    })
+    .withFailureHandler(function(e){ st.textContent='❌ '+(e.message||e); st.style.color='var(--re)'; })
+    .sendWaCustomMessage(msg, recipient==='group' ? groupPhone : null);
+}
+
+function waTemplate(type){
+  const today = new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+  const todayISO_ = todayISO ? todayISO() : new Date().toISOString().slice(0,10);
+  // Build EOD performance from live data
+  let perfLines = '';
+  if(R && R.length && typeof TEAM!=='undefined'){
+    const TARGET_=15;
+    const thisM=todayISO_.slice(0,7);
+    TEAM.forEach(function(n){
+      const done=R.filter(function(r){return r.owner===n&&r.endISO===todayISO_;}).length;
+      const tgt=(AGENT_TARGETS[n]&&AGENT_TARGETS[n][thisM])||TARGET_;
+      const pct=Math.round(done/tgt*100);
+      const icon=pct>=120?'🚀':pct>=80?'✅':pct>=50?'⚠️':'🔴';
+      perfLines+=`${icon} ${n.split(' ')[0]}: ${done}/${tgt} (${pct}%)\n`;
+    });
+  }
+  const templates = {
+    case:    `📋 *Case Follow-up — ${today}*\n\nHi, please update the status on:\n• Case #: ___\n• Vendor: ___\n• Owner: ___\n• Current status: ___\n• Next action: ___\n• ETA: ___\n\nReply to confirm. Thank you! 🙏`,
+    pending: `⏳ *Pending Cases Check — ${today}*\n\nHi team, please review your pending cases:\n\n• How many pending cases do you have?\n• What is blocking them?\n• Expected close date?\n\nPlease reply with updates on each pending case. Target is zero pending by EOD! 💪`,
+    urgent:  `🚨 *URGENT — Action Required — ${today}*\n\nThis needs immediate attention:\n• Case/Item: ___\n• Owner: ___\n• Issue: ___\n• Deadline: ___\n\nPlease action NOW and confirm once done. Thank you!`,
+    project: `🚀 *Project Status Check — ${today}*\n\nQuick status on the current special project:\n\n• Cases completed so far: ___\n• Blockers or issues: ___\n• ETA for next milestone: ___\n\nPlease reply with your update. Thanks!`,
+    eod:     `🌙 *EOD Performance — ${today}*\n\n📊 Team Results:\n${perfLines||'• Check dashboard for details\n'}\n📌 Please share:\n✅ What did you finish today?\n⏳ What is still pending and why?\n🔁 Any escalations or blockers?\n📅 What is your plan for tomorrow?\n\nGreat work today team! Keep pushing 💪`
+  };
+  document.getElementById('wa-manual-msg').value = templates[type] || '';
+  document.getElementById('wa-manual-msg').focus();
 }
 
 function toggleProjectMode(agent){
@@ -2328,12 +3247,20 @@ function renderOrgView() {
         const tgt = getAgentTarget(a, toDate) * rangeDays;
         const p   = Math.min(Math.round(pct(n, tgt) * 100), 100);
         const t   = perfTier(a);
+        const skuDone = R.filter(r=>r.owner===a&&r.endISO&&r.endISO.slice(0,7)===thisM).reduce((s,r)=>s+(r.skuAdded||0),0);
+        const skuTgt  = (SKU_TARGETS[a]&&SKU_TARGETS[a][thisM])||0;
+        const skuPct  = skuTgt>0?Math.min(Math.round(skuDone/skuTgt*100),100):0;
+        const skuCol  = skuDone>=skuTgt&&skuTgt>0?'var(--gr)':skuDone>0?'var(--bl)':'var(--di)';
         return `<div style="flex:1;min-width:100px;background:var(--sur2);border-radius:var(--rs);padding:8px 10px">
           <div style="font-size:10px;font-weight:600;color:var(--mu);margin-bottom:4px">${a.split(' ')[0]}</div>
           <div style="height:4px;background:var(--bor);border-radius:2px;margin-bottom:4px">
             <div style="height:100%;width:${p}%;background:${t.col};border-radius:2px"></div>
           </div>
           <div style="font-size:11px;font-weight:700;color:${t.col}">${n} <span style="font-size:9px;font-weight:400;color:var(--mu)">/ ${tgt} tgt</span></div>
+          ${skuTgt>0?`<div style="height:3px;background:var(--bor);border-radius:2px;margin-top:5px">
+            <div style="height:100%;width:${skuPct}%;background:${skuCol};border-radius:2px"></div>
+          </div>
+          <div style="font-size:9px;color:${skuCol};margin-top:2px">📦 SKU ${skuDone}/${skuTgt}</div>`:''}
         </div>`;
       }).join('')}
     </div>` : ''}
@@ -2490,10 +3417,155 @@ function renderOrgView() {
             ` : `<span style="font-size:9px;background:var(--bl2);color:var(--bl);border-radius:4px;padding:2px 6px;font-weight:600">📋 Queue</span>`}
           </div>
 
+
         </div>
       </div>`;
     }).join('')}
   </div></div>`;
+
+  // ── Onground Requests progress (DoD / WoW / MoM / Today live) ───────────────
+  if (!isAgent && MR_DATA && MR_DATA.byAgentDate) {
+    const bad     = MR_DATA.byAgentDate      || {};  // assigned (col AA)
+    const aad     = MR_DATA.byAgentActionDate || {};  // actions  (col AB)
+    const mrByDate= MR_DATA.byDate     || {};
+    const mrBA    = MR_DATA.byAgent    || {};
+    const todayS  = todayISO();
+
+    // Sum assigned (AA) per agent for a date range
+    function mrCount(agent, start, end) {
+      const agDates = bad[agent] || {};
+      return Object.keys(agDates).filter(d => d >= start && d <= end)
+        .reduce((s,d) => s + agDates[d], 0);
+    }
+    // Sum actions (AB) per agent for a date range
+    function mrActionCount(agent, start, end) {
+      const agDates = aad[agent] || {};
+      return Object.keys(agDates).filter(d => d >= start && d <= end)
+        .reduce((s,d) => s + agDates[d], 0);
+    }
+
+    // Periods
+    const wk0  = isoWeekOf(0), wk1 = isoWeekOf(1);
+    const mo0  = isoMonthOf(0), mo1 = isoMonthOf(1);
+    const yest = _isoAdd(todayS, -1);
+
+    // DoD delta: today vs yesterday
+    const dodData = TEAM.map(a => ({
+      a, today: mrCount(a, todayS, todayS), yest: mrCount(a, yest, yest)
+    }));
+    // WoW delta: this week vs last week
+    const wowData = TEAM.map(a => ({
+      a, cur: mrCount(a, wk0.start, wk0.end), prev: mrCount(a, wk1.start, wk1.end)
+    }));
+    // MoM delta: this month vs last month
+    const momData = TEAM.map(a => ({
+      a, cur: mrCount(a, mo0.start, todayS), prev: mrCount(a, mo1.start, mo1.end)
+    }));
+
+    function delta(cur, prev) {
+      if (!prev && !cur) return '<span style="color:var(--di)">—</span>';
+      const d = cur - prev;
+      const col = d > 0 ? 'var(--gr)' : d < 0 ? 'var(--re)' : 'var(--mu)';
+      return `<span style="color:${col};font-weight:700">${d>0?'▲':''}${d<0?'▼':''}${Math.abs(d)}</span>`;
+    }
+
+    html += `
+    <div class="card" style="margin-top:20px">
+      <div class="sh" style="margin-bottom:14px">
+        <div>
+          <div class="stit">📋 Onground Requests Progress</div>
+          <div style="font-size:11px;color:var(--mu);margin-top:2px">DoD · WoW · MoM · Today live — based on assignment date</div>
+        </div>
+        <button class="btn" style="font-size:11px" onclick="loadMainRequestData()">↻ Refresh</button>
+      </div>
+
+      <!-- Today live counts -->
+      <div style="font-size:10px;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">📅 Today — Live</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;margin-bottom:16px">
+        ${TEAM.map(a => {
+          const todayN  = mrCount(a, todayS, todayS);
+          const yestN   = mrCount(a, yest, yest);
+          const actN    = mrActionCount(a, todayS, todayS);
+          const d       = todayN - yestN;
+          const dHtml   = d > 0 ? `<span style="color:var(--gr);font-size:9px">▲${d} vs yest</span>`
+                        : d < 0 ? `<span style="color:var(--re);font-size:9px">▼${Math.abs(d)} vs yest</span>`
+                        : `<span style="color:var(--di);font-size:9px">= same</span>`;
+          const pct     = todayN ? Math.round(actN/todayN*100) : 0;
+          return `<div style="background:var(--sur2);border-radius:var(--rs);padding:10px 12px">
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+              <div class="av" style="background:${COLORS[a]};width:24px;height:24px;font-size:9px">${ini(a)}</div>
+              <div style="font-size:11px;font-weight:700">${a.split(' ')[0]}</div>
+            </div>
+            <div style="display:flex;align-items:baseline;gap:6px">
+              <div style="font-size:24px;font-weight:800;color:var(--or)">${todayN}</div>
+              <div style="font-size:11px;color:var(--mu)">assigned</div>
+            </div>
+            <div style="display:flex;align-items:baseline;gap:6px;margin-top:3px">
+              <div style="font-size:18px;font-weight:700;color:#16a34a">${actN}</div>
+              <div style="font-size:10px;color:var(--mu)">actions${todayN ? ' ('+pct+'%)' : ''}</div>
+            </div>
+            <div style="margin-top:4px">${dHtml}</div>
+          </div>`;
+        }).join('')}
+      </div>
+
+      <!-- DoD / WoW / MoM table -->
+      <div style="overflow-x:auto">
+        <table style="min-width:680px">
+          <thead>
+            <tr>
+              <th rowspan="2">Agent</th>
+              <th colspan="2" style="text-align:center;border-bottom:1px solid var(--bor)">Today</th>
+              <th rowspan="2" style="text-align:center">DoD Δ<br><span style="font-weight:400;font-size:9px">assigned</span></th>
+              <th colspan="2" style="text-align:center;border-bottom:1px solid var(--bor)">This Week</th>
+              <th rowspan="2" style="text-align:center">WoW Δ</th>
+              <th colspan="2" style="text-align:center;border-bottom:1px solid var(--bor)">This Month</th>
+              <th rowspan="2" style="text-align:center">MoM Δ</th>
+            </tr>
+            <tr>
+              <th style="text-align:center;color:var(--or)">Assigned</th>
+              <th style="text-align:center;color:#16a34a">Actions</th>
+              <th style="text-align:center;color:var(--or)">Assigned</th>
+              <th style="text-align:center;color:#16a34a">Actions</th>
+              <th style="text-align:center;color:var(--or)">Assigned</th>
+              <th style="text-align:center;color:#16a34a">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${TEAM.map(a => {
+              const td   = mrCount(a, todayS, todayS);
+              const yd   = mrCount(a, yest, yest);
+              const ta   = mrActionCount(a, todayS, todayS);
+              const wkC  = mrCount(a, wk0.start, wk0.end);
+              const wkP  = mrCount(a, wk1.start, wk1.end);
+              const wkA  = mrActionCount(a, wk0.start, wk0.end);
+              const moC  = mrCount(a, mo0.start, todayS);
+              const moP  = mrCount(a, mo1.start, mo1.end);
+              const moA  = mrActionCount(a, mo0.start, todayS);
+              return `<tr>
+                <td><div style="display:flex;align-items:center;gap:7px">
+                  <div class="av" style="background:${COLORS[a]};width:22px;height:22px;font-size:8px">${ini(a)}</div>
+                  <strong>${a.split(' ')[0]}</strong>
+                </div></td>
+                <td style="text-align:center;font-weight:800;color:var(--or)">${td}</td>
+                <td style="text-align:center;font-weight:700;color:#16a34a">${ta}</td>
+                <td style="text-align:center">${delta(td,yd)}</td>
+                <td style="text-align:center;font-weight:700">${wkC}</td>
+                <td style="text-align:center;color:#16a34a">${wkA}</td>
+                <td style="text-align:center">${delta(wkC,wkP)}</td>
+                <td style="text-align:center;font-weight:700">${moC}</td>
+                <td style="text-align:center;color:#16a34a">${moA}</td>
+                <td style="text-align:center">${delta(moC,moP)}</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+      <div style="font-size:10px;color:var(--di);margin-top:8px">
+        Assigned = col AA · Actions = col AB · ↻ Refresh to get latest
+      </div>
+    </div>`;
+  }
 
   // ── Raw data table (manager only) ────────────────────────────────────────────
   if (!isAgent) {

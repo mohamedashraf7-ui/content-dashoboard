@@ -12,6 +12,21 @@ var TEAM_EMAILS = [
   { email: 'omar.m@talabat.com',        name: 'Omar Elattar'   },
 ];
 
+// ═══ ONE-TIME SETUP — run this ONCE from the Script editor, then delete ══════
+// Run this function manually in Apps Script editor to pre-load credentials
+function _initWaCredentials() {
+  var props = PropertiesService.getScriptProperties();
+  var raw   = props.getProperty('WA_CONFIG');
+  var cfg   = {};
+  try { cfg = JSON.parse(raw||'{}'); } catch(e) {}
+  cfg.apikey = '5654406';
+  cfg.phone  = '201020809266'; // digits only, no +
+  props.setProperty('WA_CONFIG', JSON.stringify(cfg));
+  Logger.log('✅ WhatsApp credentials saved to Script Properties.');
+  Logger.log('Phone: +201020809266 | API key: gBb3AH5K4cgq');
+  Logger.log('You can now delete this function from the code.');
+}
+
 // ═══ WEB APP ENTRY ══════════════════════════════════════════════════════════
 function doGet(e) {
   return HtmlService.createHtmlOutputFromFile('index')
@@ -555,29 +570,57 @@ function saveProjectMapping(projectName, mappingJson) {
 // ═══ GOOGLE DRIVE CASE MAPPING ═══════════════════════════════════════════════
 var DRIVE_FOLDER_ID = '16UhJIyxDXa8Y9Allnot1lvKB57W5Dy49';
 
+// Search for files matching case number across root folder + all subfolders (DriveApp, recursive 3 levels)
 function searchDriveForCase(caseNo) {
   try {
-    var folder = DriveApp.getFolderById(DRIVE_FOLDER_ID);
+    var root = DriveApp.getFolderById(DRIVE_FOLDER_ID);
     var results = [];
-    // Search files whose name contains the case number
-    var files = folder.searchFiles('title contains "' + caseNo + '"');
-    while (files.hasNext()) {
-      var f = files.next();
-      results.push({ id: f.getId(), name: f.getName(), url: f.getUrl(), mimeType: f.getMimeType() });
-    }
-    // Also search subfolders one level deep
-    var subFolders = folder.getFolders();
-    while (subFolders.hasNext()) {
-      var sub = subFolders.next();
-      var subFiles = sub.searchFiles('title contains "' + caseNo + '"');
-      while (subFiles.hasNext()) {
-        var sf = subFiles.next();
-        results.push({ id: sf.getId(), name: sf.getName(), url: sf.getUrl(), mimeType: sf.getMimeType() });
+    function searchInFolder(folder) {
+      var files = folder.searchFiles('title contains "' + caseNo + '"');
+      while (files.hasNext()) {
+        var f = files.next();
+        results.push({ id: f.getId(), name: f.getName(), url: f.getUrl(), mimeType: f.getMimeType() });
       }
     }
+    function walkFolders(folder, depth) {
+      searchInFolder(folder);
+      if (depth >= 3) return;
+      var subs = folder.getFolders();
+      while (subs.hasNext()) { walkFolders(subs.next(), depth + 1); }
+    }
+    walkFolders(root, 0);
     return results;
   } catch(e) {
     return [];
+  }
+}
+
+// List immediate contents of a folder using DriveApp (no advanced service needed)
+function browseDriveFolder(folderId) {
+  var id = folderId || DRIVE_FOLDER_ID;
+  try {
+    var folder = DriveApp.getFolderById(id);
+    var items = [];
+    // Subfolders first
+    var subs = folder.getFolders();
+    while (subs.hasNext()) {
+      var s = subs.next();
+      items.push({ id: s.getId(), name: s.getName(), url: s.getUrl(), mimeType: 'application/vnd.google-apps.folder', isFolder: true, modified: '', size: '' });
+    }
+    // Then files
+    var files = folder.getFiles();
+    while (files.hasNext()) {
+      var f = files.next();
+      var bytes = f.getSize ? f.getSize() : 0;
+      var sz = bytes > 1048576 ? (Math.round(bytes/1048576*10)/10) + ' MB' : bytes > 1024 ? Math.round(bytes/1024) + ' KB' : bytes > 0 ? bytes + ' B' : '';
+      var mod = f.getLastUpdated ? f.getLastUpdated().toISOString().slice(0,10) : '';
+      items.push({ id: f.getId(), name: f.getName(), url: f.getUrl(), mimeType: f.getMimeType(), isFolder: false, modified: mod, size: sz });
+    }
+    // Sort: folders by name, then files by name
+    items.sort(function(a,b){ if(a.isFolder!==b.isFolder) return a.isFolder?-1:1; return a.name.localeCompare(b.name); });
+    return { folderId: id, items: items };
+  } catch(e) {
+    return { folderId: id, items: [], error: e.toString() };
   }
 }
 
@@ -607,6 +650,21 @@ function getCaseDriveLinks(agent) {
     }
   }
   return results;
+}
+
+// Returns { caseNo: agentName } for all linked cases — used for quality metrics
+function getAllDriveLinkCaseNos() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('Case Drive Links');
+  if (!sheet) return {};
+  var data = sheet.getDataRange().getValues();
+  var out = {};
+  for (var i = 1; i < data.length; i++) {
+    var caseNo = String(data[i][2]).trim();
+    var agent  = String(data[i][1]).trim();
+    if (caseNo) out[caseNo] = agent;
+  }
+  return out;
 }
 
 function removeCaseDriveLink(linkId) {
@@ -643,4 +701,497 @@ function saveAttendance(agent, date, status, notes) {
     sheet.appendRow([agent,date,status,notes||'',email,new Date()]);
   }
   return { success: true };
+}
+
+function getSkuTargets() {
+  var raw = PropertiesService.getScriptProperties().getProperty('SKU_TARGETS');
+  if (!raw) return {};
+  try { return JSON.parse(raw); } catch(e) { return {}; }
+}
+
+function saveSkuTarget(agent, month, val) {
+  var data = getSkuTargets();
+  if (!data[agent]) data[agent] = {};
+  data[agent][month] = val;
+  PropertiesService.getScriptProperties().setProperty('SKU_TARGETS', JSON.stringify(data));
+  return { success: true };
+}
+
+// ═══ WHATSAPP — CallMeBot ════════════════════════════════════════════════════
+
+function getWaConfig() {
+  var raw = PropertiesService.getScriptProperties().getProperty('WA_CONFIG');
+  if (!raw) return {};
+  try { return JSON.parse(raw); } catch(e) { return {}; }
+}
+
+function saveWaConfig(cfg) {
+  PropertiesService.getScriptProperties().setProperty('WA_CONFIG', JSON.stringify(cfg));
+  // Rebuild time-based triggers whenever schedule is saved
+  _setupWaTriggers(cfg);
+  var activeTimes = [1,2,3,4].filter(function(i){ return cfg['time'+i] && (cfg['time'+i+'on']===true||cfg['time'+i+'on']==='true'); });
+  return { success: true, triggersSet: activeTimes.length };
+}
+
+function _sendWa(text, phone, apikey) {
+  if (!phone || !apikey) return { ok: false, error: 'Not configured' };
+  try {
+    var cleanPhone = phone.replace(/^\+/, ''); // CallMeBot prefers digits only
+    var url = 'https://api.callmebot.com/whatsapp.php?phone='
+      + encodeURIComponent(cleanPhone)
+      + '&text=' + encodeURIComponent(text)
+      + '&apikey=' + encodeURIComponent(apikey);
+    var resp = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+    var code = resp.getResponseCode();
+    return (code === 200 || code === 201) ? { ok: true } : { ok: false, error: 'HTTP ' + code };
+  } catch(e) {
+    return { ok: false, error: e.toString() };
+  }
+}
+
+function sendWaTest(phone, apikey) {
+  var text = '✅ *Content Team Dashboard*\n\nTest message sent successfully! Your WhatsApp notifications are configured correctly. 🎉';
+  return _sendWa(text, phone, apikey);
+}
+
+function _buildProgressMessage() {
+  var ss    = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('SalesForce 2026');
+  if (!sheet) return null;
+
+  var today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  var data  = sheet.getDataRange().getValues();
+  var hdr   = data[0].map(function(h){ return String(h).trim().toLowerCase(); });
+
+  var ownerIdx  = hdr.indexOf('content owner');
+  var statusIdx = hdr.indexOf('status');
+  var endIdx    = hdr.indexOf('end date');
+  var startIdx  = hdr.indexOf('start date');
+
+  if (ownerIdx < 0) {
+    // fallback: use known column positions Z=25, AA=26, AB=27, AD=29
+    ownerIdx  = 25; statusIdx = 26; startIdx = 27; endIdx = 29;
+  }
+
+  var TEAM_NAMES = ['Mohamed Gadallah','Seliem Mohamed','Omar Elattar','Mahmoud Amin'];
+  var DEFAULT_TARGET = 15;
+
+  // Load targets from Properties
+  var tgtRaw = PropertiesService.getScriptProperties().getProperty('AGENT_TARGETS');
+  var tgtMap = {};
+  try { tgtMap = JSON.parse(tgtRaw||'{}'); } catch(e) {}
+  var thisM = today.slice(0,7);
+
+  var stats = {};
+  TEAM_NAMES.forEach(function(n){ stats[n] = { done:0, pending:0, pfb:0, rej:0 }; });
+
+  for (var i = 1; i < data.length; i++) {
+    var row    = data[i];
+    var owner  = String(row[ownerIdx]||'').trim();
+    var status = String(row[statusIdx]||'').trim();
+    var endRaw = row[endIdx];
+    var endISO = endRaw ? Utilities.formatDate(new Date(endRaw), Session.getScriptTimeZone(), 'yyyy-MM-dd') : '';
+    if (!stats[owner]) continue;
+    if (endISO === today)          stats[owner].done++;
+    if (status === 'Pending')      stats[owner].pending++;
+    if (status === 'Pending Feedback') stats[owner].pfb++;
+    if (status === 'Rejected')     stats[owner].rej++;
+  }
+
+  var teamDone = 0, teamTgt = 0, lines = [];
+  TEAM_NAMES.forEach(function(n){
+    var tgt = (tgtMap[n] && tgtMap[n][thisM]) || DEFAULT_TARGET;
+    var s   = stats[n];
+    var pct = Math.round(s.done / tgt * 100);
+    var bar = pct >= 120 ? '🚀' : pct >= 80 ? '✅' : pct >= 50 ? '⚠️' : '🔴';
+    lines.push(bar + ' *' + n.split(' ')[0] + '*: ' + s.done + '/' + tgt + ' (' + pct + '%)');
+    teamDone += s.done;
+    teamTgt  += tgt;
+  });
+
+  var teamPct  = Math.round(teamDone / teamTgt * 100);
+  var teamIcon = teamPct >= 100 ? '🎯' : teamPct >= 80 ? '📈' : '⚠️';
+
+  var top = TEAM_NAMES.slice().sort(function(a,b){ return stats[b].done - stats[a].done; })[0];
+  var totalPend = TEAM_NAMES.reduce(function(s,n){ return s + stats[n].pending + stats[n].pfb; }, 0);
+  var totalRej  = TEAM_NAMES.reduce(function(s,n){ return s + stats[n].rej; }, 0);
+
+  var now   = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'HH:mm');
+  var dayLbl= Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'EEE dd MMM');
+
+  var msg = '📊 *Team Progress Update*\n'
+    + dayLbl + ' · ' + now + '\n'
+    + '─────────────────\n'
+    + lines.join('\n') + '\n'
+    + '─────────────────\n'
+    + teamIcon + ' *Team Total: ' + teamDone + '/' + teamTgt + ' (' + teamPct + '%)*\n'
+    + '🏆 Top today: ' + top.split(' ')[0] + ' (' + stats[top].done + ' cases)\n'
+    + '⏳ Pending: ' + totalPend + '  🔴 Rejected: ' + totalRej;
+
+  // ── Onground Requests section ──────────────────────────────────────────────
+  try {
+    var mrData = getMainRequestData(null, null);
+    if (mrData && !mrData.error) {
+      var bad = mrData.byAgentDate      || {};  // assigned per day (AA)
+      var aad = mrData.byAgentActionDate || {};  // action per day (AB)
+      var mrLines = [];
+      TEAM_NAMES.forEach(function(n) {
+        var short    = MR_AGENT_SHORT[n] || n.split(' ')[0];
+        var assigned = (bad[n] && bad[n][today]) || 0;
+        var actions  = (aad[n] && aad[n][today]) || 0;
+        mrLines.push('• *' + short + '*: ' + assigned + ' assigned · ' + actions + ' action' + (actions !== 1 ? 's' : ''));
+      });
+      if (mrLines.length) {
+        msg += '\n\n📋 *Onground Requests — Today*\n' + mrLines.join('\n');
+      }
+    }
+  } catch(mrErr) {}
+
+  return msg;
+}
+
+function sendWaProgressUpdate() {
+  var cfg = getWaConfig();
+  if (!cfg.phone || !cfg.apikey) return { ok: false, error: 'WhatsApp not configured in Settings' };
+  var msg = _buildProgressMessage();
+  if (!msg) return { ok: false, error: 'Could not read sheet data' };
+  return _sendWa(msg, cfg.phone, cfg.apikey);
+}
+
+function sendWaCustomMessage(text, groupPhone) {
+  var cfg = getWaConfig();
+  if (!cfg.apikey) return { ok: false, error: 'WhatsApp not configured in Settings' };
+  var phone = groupPhone ? groupPhone.replace(/^\+/, '') : cfg.phone;
+  if (!phone) return { ok: false, error: 'No phone number configured' };
+  return _sendWa(text, phone, cfg.apikey);
+}
+
+// ── Time-based trigger management ────────────────────────────────────────────
+function _setupWaTriggers(cfg) {
+  // Remove all existing WA triggers
+  ScriptApp.getProjectTriggers().forEach(function(t){
+    if (t.getHandlerFunction() === 'sendWaProgressUpdate') {
+      ScriptApp.deleteTrigger(t);
+    }
+  });
+  if (!cfg.scheduleEnabled || cfg.scheduleEnabled === 'false') return;
+  [1,2,3,4].forEach(function(i){
+    var t   = cfg['time'+i];
+    var on  = cfg['time'+i+'on'];
+    if (!t || !(on === true || on === 'true')) return;
+    var parts = t.split(':');
+    var hour  = parseInt(parts[0]);
+    var min   = parseInt(parts[1]||'0');
+    ScriptApp.newTrigger('sendWaProgressUpdate')
+      .timeBased()
+      .everyDays(1)
+      .atHour(hour)
+      .nearMinute(min)
+      .inTimezone(Session.getScriptTimeZone())
+      .create();
+  });
+}
+
+// ═══ MAIN REQUEST SHEET ══════════════════════════════════════════════════════
+var MR_SHEET_ID  = '1ZI_6rA8IntOgDcRXWsPSpkP62c9dGEySrrXvb3WWYAw';
+var MR_TAB_NAME  = 'Main request';
+var MR_NAME_MAP  = {
+  'ashraf':  'Mohamed Gadallah',
+  'seleem':  'Seliem Mohamed',
+  'selim':   'Seliem Mohamed',
+  'omar':    'Omar Elattar',
+  'waheed':  'Mahmoud Amin',
+  'wahid':   'Mahmoud Amin'
+};
+
+// Column indices (0-based) in Main request sheet
+var MR_COL_TIMESTAMP    = 0;   // A – form submission time
+var MR_COL_CHAIN        = 3;   // D – Chain Name
+var MR_COL_TYPE         = 4;   // E – Request Type
+var MR_COL_STATUS       = 20;  // U – Done / Canceled / Pending Regional …
+var MR_COL_OWNER        = 21;  // V – Seleem / Ashraf / Omar / Waheed  (1-indexed col 22)
+var MR_COL_EMAIL_STATUS = 25;  // Z – done / pending regional
+var MR_COL_ASSIGNED_AT  = 26;  // AA – Assigned date ★ written by auto-assign / on-edit trigger
+var MR_COL_ACTION_DATE  = 27;  // AB – Action date (read-only — set by the processing agent)
+
+// Queue agents for auto-assignment: full name → short name written into the sheet
+var MR_AGENT_SHORT = {
+  'Mohamed Gadallah': 'Ashraf',
+  'Seliem Mohamed':   'Seleem',
+  'Omar Elattar':     'Omar',
+  'Mahmoud Amin':     'Waheed'
+};
+var MR_QUEUE_AGENTS = ['Mohamed Gadallah','Seliem Mohamed','Omar Elattar','Mahmoud Amin'];
+
+// ── ONE-TIME SETUP ─────────────────────────────────────────────────────────
+// Run _setupMrTriggers() ONCE from the Apps Script editor.
+// It installs both the form-submit (auto-assign) and on-edit (timestamp) triggers.
+function _setupMrTriggers() {
+  var handlers = ['mrOnOwnerEdit', 'mrAutoAssign'];
+  ScriptApp.getProjectTriggers().forEach(function(t) {
+    if (handlers.indexOf(t.getHandlerFunction()) >= 0) ScriptApp.deleteTrigger(t);
+  });
+  // Auto-assign on new form submission
+  ScriptApp.newTrigger('mrAutoAssign')
+    .forSpreadsheet(MR_SHEET_ID)
+    .onFormSubmit()
+    .create();
+  // Stamp timestamp when Owner is manually edited
+  ScriptApp.newTrigger('mrOnOwnerEdit')
+    .forSpreadsheet(MR_SHEET_ID)
+    .onEdit()
+    .create();
+  Logger.log('✅ mrAutoAssign + mrOnOwnerEdit triggers installed.');
+}
+// Keep old name as alias so existing installations still work
+function _setupMrOwnerTrigger() { _setupMrTriggers(); }
+
+// ── AUTO-ASSIGN: fires on every new form submission ────────────────────────
+function mrAutoAssign(e) {
+  try {
+    var ss    = SpreadsheetApp.openById(MR_SHEET_ID);
+    var sheet = ss.getSheetByName(MR_TAB_NAME);
+    if (!sheet) return;
+
+    var newRow = e.range.getRow();
+    var tz     = Session.getScriptTimeZone();
+    var today  = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
+
+    // Count today's assignments per queue agent
+    var data   = sheet.getDataRange().getValues();
+    var counts = {};
+    MR_QUEUE_AGENTS.forEach(function(a){ counts[a] = 0; });
+
+    for (var i = 1; i < data.length; i++) {
+      if (i === newRow - 1) continue;           // skip the new row itself
+      var ownerRaw = String(data[i][MR_COL_OWNER] || '').trim().toLowerCase();
+      var fullName = MR_NAME_MAP[ownerRaw];
+      if (!fullName || counts[fullName] === undefined) continue;
+
+      // Use AA (Assigned date) if available, else submission timestamp
+      var dateRaw = data[i][MR_COL_ASSIGNED_AT] || data[i][MR_COL_TIMESTAMP];
+      if (!dateRaw) continue;
+      var d = (dateRaw instanceof Date) ? dateRaw : new Date(dateRaw);
+      if (isNaN(d.getTime())) continue;
+      if (Utilities.formatDate(d, tz, 'yyyy-MM-dd') === today) counts[fullName]++;
+    }
+
+    // Pick agent with fewest today (stable sort: same count → first in list order)
+    var chosen = MR_QUEUE_AGENTS.reduce(function(best, a) {
+      return (counts[a] < counts[best]) ? a : best;
+    });
+    var shortName = MR_AGENT_SHORT[chosen] || chosen.split(' ')[0];
+
+    // Write owner + assignment timestamp into the new row
+    var now = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd HH:mm:ss');
+    sheet.getRange(newRow, MR_COL_OWNER + 1).setValue(shortName);
+    sheet.getRange(newRow, MR_COL_ASSIGNED_AT + 1).setValue(now);
+
+    // Build summary of today's counts after this assignment
+    counts[chosen]++;
+    var summary = MR_QUEUE_AGENTS.map(function(a) {
+      return (MR_AGENT_SHORT[a] || a.split(' ')[0]) + ': ' + counts[a];
+    }).join(' · ');
+
+    var chain   = String(data[newRow-1][MR_COL_CHAIN] || '').trim() || '—';
+    var reqType = String(data[newRow-1][MR_COL_TYPE]  || '').trim() || '—';
+
+    // Send WA notification
+    var msg = '📋 New Onground Request\n'
+      + '👤 Assigned to: *' + chosen.split(' ')[0] + '* (' + shortName + ')\n'
+      + '🏪 Chain: ' + chain + '\n'
+      + '📝 Type: ' + reqType + '\n'
+      + '📊 Today\'s assignments — ' + summary;
+    _sendWaProgressUpdate_internal(msg);
+
+  } catch(err) {
+    Logger.log('mrAutoAssign error: ' + err);
+  }
+}
+
+// Internal helper: send WA using stored config (no sheet data needed)
+function _sendWaProgressUpdate_internal(text) {
+  try {
+    var cfg = getWaConfig();
+    if (!cfg || !cfg.apikey || !cfg.phone) return;
+    _sendWa(text, cfg.phone, cfg.apikey);
+  } catch(e) {}
+}
+
+// ── EDIT TRIGGER (fires on every edit to the Main request sheet) ───────────
+function mrOnOwnerEdit(e) {
+  try {
+    var sheet = e.range.getSheet();
+    if (sheet.getName() !== MR_TAB_NAME) return;
+
+    // Only act when the Owner column (col 22 = 1-indexed) is edited
+    var col = e.range.getColumn();
+    if (col !== MR_COL_OWNER + 1) return;         // +1 because getColumn() is 1-indexed
+
+    var row      = e.range.getRow();
+    if (row < 2) return;                           // skip header
+
+    var newOwner = String(e.value || '').trim();
+    if (!newOwner) return;                         // owner was cleared — don't stamp
+
+    var tz    = Session.getScriptTimeZone();
+    var now   = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd HH:mm:ss');
+
+    // Write assignment timestamp to col AB (MR_COL_ASSIGNED_AT + 1 = 28, 1-indexed)
+    sheet.getRange(row, MR_COL_ASSIGNED_AT + 1).setValue(now);
+  } catch(err) {
+    // Silently swallow — don't break the user's editing experience
+  }
+}
+
+// ── BACK-FILL (run once to populate existing rows that have an Email Date) ─
+// For rows where Assigned At is blank but Last Email Sent Date has a value,
+// copy the Email Date into the Assigned At column as a best-effort backfill.
+function _backfillMrAssignedAt() {
+  var ss    = SpreadsheetApp.openById(MR_SHEET_ID);
+  var sheet = ss.getSheetByName(MR_TAB_NAME);
+  if (!sheet) { Logger.log('Sheet not found'); return; }
+  var data  = sheet.getDataRange().getValues();
+  var tz    = Session.getScriptTimeZone();
+  var filled = 0;
+
+  for (var i = 1; i < data.length; i++) {
+    var row        = data[i];
+    var assignedAt = String(row[MR_COL_ASSIGNED_AT] || '').trim();
+    if (assignedAt) continue;                          // already stamped
+
+    var owner = String(row[MR_COL_OWNER] || '').trim();
+    if (!owner) continue;                              // unassigned row — skip
+
+    // Try Last Email Sent Date (col Z, index 25) first
+    var emailDate = row[25];
+    if (emailDate) {
+      var d = (emailDate instanceof Date) ? emailDate : new Date(emailDate);
+      if (!isNaN(d.getTime())) {
+        var iso = Utilities.formatDate(d, tz, 'yyyy-MM-dd');
+        sheet.getRange(i + 1, MR_COL_ASSIGNED_AT + 1).setValue(iso);
+        filled++;
+        continue;
+      }
+    }
+
+    // Fallback: use submission Timestamp date
+    var ts = row[MR_COL_TIMESTAMP];
+    if (ts) {
+      var d2 = (ts instanceof Date) ? ts : new Date(ts);
+      if (!isNaN(d2.getTime())) {
+        var iso2 = Utilities.formatDate(d2, tz, 'yyyy-MM-dd');
+        sheet.getRange(i + 1, MR_COL_ASSIGNED_AT + 1).setValue(iso2);
+        filled++;
+      }
+    }
+  }
+  Logger.log('✅ Back-filled ' + filled + ' rows with Assigned At dates.');
+}
+
+function getMainRequestData(dateFrom, dateTo) {
+  try {
+    var ss    = SpreadsheetApp.openById(MR_SHEET_ID);
+    var sheet = ss.getSheetByName(MR_TAB_NAME);
+    if (!sheet) return { error: 'Tab "Main request" not found' };
+
+    var data = sheet.getDataRange().getValues();
+    if (data.length < 2) return { rows: [], byAgent: {}, totals: {} };
+
+    var chainIdx = 3;  // col D – Chain Name (fallback)
+    var hdr = data[0];
+    for (var hi = 0; hi < hdr.length; hi++) {
+      if (String(hdr[hi]).toLowerCase().indexOf('chain name') >= 0) { chainIdx = hi; break; }
+    }
+
+    var tz   = Session.getScriptTimeZone();
+    var rows = [];
+
+    for (var i = 1; i < data.length; i++) {
+      var row      = data[i];
+      var owner    = String(row[MR_COL_OWNER] || '').trim();
+      if (!owner) continue;                              // unassigned — skip entirely
+
+      // ── Assignment date: AA (ASSIGNED_AT) → submission Timestamp fallback ──
+      var assignedRaw = row[MR_COL_ASSIGNED_AT];
+      if (!assignedRaw) assignedRaw = row[MR_COL_TIMESTAMP];
+      if (!assignedRaw) continue;
+
+      var dateObj = (assignedRaw instanceof Date) ? assignedRaw : new Date(assignedRaw);
+      if (isNaN(dateObj.getTime())) continue;
+      var dateISO = Utilities.formatDate(dateObj, tz, 'yyyy-MM-dd');
+
+      if (dateFrom && dateISO < dateFrom) continue;
+      if (dateTo   && dateISO > dateTo)   continue;
+
+      // ── Action date: AB (ACTION_DATE) — may be empty ──
+      var actionRaw = row[MR_COL_ACTION_DATE];
+      var actionISO = '';
+      if (actionRaw) {
+        var aObj = (actionRaw instanceof Date) ? actionRaw : new Date(actionRaw);
+        if (!isNaN(aObj.getTime())) actionISO = Utilities.formatDate(aObj, tz, 'yyyy-MM-dd');
+      }
+
+      var ownerKey = owner.toLowerCase();
+      var ownerFull = MR_NAME_MAP[ownerKey] || owner;
+      var status   = String(row[MR_COL_STATUS]||'').trim();
+      var chain    = String(row[chainIdx]||'').trim();
+
+      rows.push({ date: dateISO, actionDate: actionISO, owner: ownerFull, status: status, chain: chain });
+    }
+
+    // Aggregate by agent
+    var TEAM_NAMES = ['Mohamed Gadallah','Seliem Mohamed','Omar Elattar','Mahmoud Amin'];
+    var byAgent = {};
+    TEAM_NAMES.forEach(function(n){
+      byAgent[n] = { done:0, rejected:0, cancelled:0, pendingContent:0, pendingRegional:0, total:0 };
+    });
+    var totals = { done:0, rejected:0, cancelled:0, pendingContent:0, pendingRegional:0, total:0 };
+
+    rows.forEach(function(r){
+      var a = byAgent[r.owner];
+      if (!a) { byAgent[r.owner] = { done:0, rejected:0, cancelled:0, pendingContent:0, pendingRegional:0, total:0 }; a = byAgent[r.owner]; }
+      var s = r.status.toLowerCase();
+      if      (s === 'done')                            { a.done++;           totals.done++;           }
+      else if (s === 'rejected')                        { a.rejected++;       totals.rejected++;       }
+      else if (s === 'canceled' || s === 'cancelled')   { a.cancelled++;      totals.cancelled++;      }
+      else if (s === 'pending content')                 { a.pendingContent++; totals.pendingContent++; }
+      else if (s === 'pending regional')                { a.pendingRegional++;totals.pendingRegional++;}
+      a.total++; totals.total++;
+    });
+
+    // Day-over-day: group by date (team totals) + per-agent daily counts
+    var byDate           = {};  // { '2026-08-20': { done, rejected, ... , total } }
+    var byAgentDate      = {};  // { 'Mohamed Gadallah': { '2026-08-20': assigned count } }
+    var byAgentActionDate = {}; // { 'Mohamed Gadallah': { '2026-08-20': action count } }
+
+    rows.forEach(function(r){
+      var s = r.status.toLowerCase();
+      // Team-level byDate
+      if (!byDate[r.date]) byDate[r.date] = { done:0, rejected:0, cancelled:0, pendingContent:0, pendingRegional:0, total:0 };
+      if      (s === 'done')                            byDate[r.date].done++;
+      else if (s === 'rejected')                        byDate[r.date].rejected++;
+      else if (s === 'canceled' || s === 'cancelled')   byDate[r.date].cancelled++;
+      else if (s === 'pending content')                 byDate[r.date].pendingContent++;
+      else if (s === 'pending regional')                byDate[r.date].pendingRegional++;
+      byDate[r.date].total++;
+
+      // Per-agent assigned per day (from AA)
+      if (!byAgentDate[r.owner]) byAgentDate[r.owner] = {};
+      if (!byAgentDate[r.owner][r.date]) byAgentDate[r.owner][r.date] = 0;
+      byAgentDate[r.owner][r.date]++;
+
+      // Per-agent action per day (from AB)
+      if (r.actionDate) {
+        if (!byAgentActionDate[r.owner]) byAgentActionDate[r.owner] = {};
+        if (!byAgentActionDate[r.owner][r.actionDate]) byAgentActionDate[r.owner][r.actionDate] = 0;
+        byAgentActionDate[r.owner][r.actionDate]++;
+      }
+    });
+
+    return { byAgent: byAgent, totals: totals, byDate: byDate,
+             byAgentDate: byAgentDate, byAgentActionDate: byAgentActionDate, rowCount: rows.length };
+  } catch(e) {
+    return { error: e.toString() };
+  }
 }
