@@ -1211,6 +1211,58 @@ function renderMRSection() {
     </div>
   </div>
   <div style="font-size:11px;color:var(--mu);margin-bottom:12px">Team done rate: <strong style="color:var(--gr)">${doneRate}%</strong> · All-time totals</div>
+
+  <!-- Per-agent request count summary table -->
+  <div style="overflow-x:auto;margin-bottom:16px">
+    <table style="min-width:520px;border-collapse:collapse">
+      <thead>
+        <tr style="background:var(--sur2)">
+          <th style="text-align:left;padding:7px 10px;font-size:10px;font-weight:700;color:var(--mu)">Agent</th>
+          <th style="text-align:center;padding:7px 8px;font-size:10px;font-weight:700;color:var(--mu)">Assigned</th>
+          <th style="text-align:center;padding:7px 8px;font-size:10px;font-weight:700;color:#16a34a">Done</th>
+          <th style="text-align:center;padding:7px 8px;font-size:10px;font-weight:700;color:#dc2626">Rejected</th>
+          <th style="text-align:center;padding:7px 8px;font-size:10px;font-weight:700;color:#ca8a04">Pend. Content</th>
+          <th style="text-align:center;padding:7px 8px;font-size:10px;font-weight:700;color:#7c3aed">Pend. Regional</th>
+          <th style="text-align:center;padding:7px 8px;font-size:10px;font-weight:700;color:var(--mu)">Cancelled</th>
+          <th style="text-align:center;padding:7px 8px;font-size:10px;font-weight:700;color:var(--gr)">Done %</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${TEAM.map((nm,i) => {
+          const a   = ba[nm] || {done:0,rejected:0,cancelled:0,pendingContent:0,pendingRegional:0,total:0};
+          const pct = a.total ? Math.round(a.done/a.total*100) : 0;
+          const col = pct>=80?'#16a34a':pct>=50?'#ca8a04':'#dc2626';
+          return `<tr style="border-top:1px solid var(--bor)">
+            <td style="padding:7px 10px">
+              <div style="display:flex;align-items:center;gap:7px">
+                <div class="av" style="background:${COLORS[nm]};width:22px;height:22px;font-size:8px">${ini(nm)}</div>
+                <strong style="font-size:12px">${nm.split(' ')[0]}</strong>
+                <span style="font-size:9px;color:var(--di)">${nm.split(' ')[1]||''}</span>
+              </div>
+            </td>
+            <td style="text-align:center;font-weight:800;color:var(--or);font-size:14px">${a.total}</td>
+            <td style="text-align:center;font-weight:700;color:#16a34a">${a.done}</td>
+            <td style="text-align:center;color:#dc2626">${a.rejected||0}</td>
+            <td style="text-align:center;color:#ca8a04">${a.pendingContent||0}</td>
+            <td style="text-align:center;color:#7c3aed">${a.pendingRegional||0}</td>
+            <td style="text-align:center;color:var(--mu)">${a.cancelled||0}</td>
+            <td style="text-align:center;font-weight:700;color:${col}">${pct}%</td>
+          </tr>`;
+        }).join('')}
+        <tr style="border-top:2px solid var(--bor);background:var(--sur2)">
+          <td style="padding:7px 10px;font-weight:700;font-size:11px;color:var(--mu)">Team Total</td>
+          <td style="text-align:center;font-weight:800;color:var(--or)">${t.total||0}</td>
+          <td style="text-align:center;font-weight:700;color:#16a34a">${t.done||0}</td>
+          <td style="text-align:center;color:#dc2626">${t.rejected||0}</td>
+          <td style="text-align:center;color:#ca8a04">${t.pendingContent||0}</td>
+          <td style="text-align:center;color:#7c3aed">${t.pendingRegional||0}</td>
+          <td style="text-align:center;color:var(--mu)">${t.cancelled||0}</td>
+          <td style="text-align:center;font-weight:700;color:${doneRate>=80?'#16a34a':doneRate>=50?'#ca8a04':'#dc2626'}">${doneRate}%</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
   <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px">`;
 
   TEAM.forEach(function(nm) {
