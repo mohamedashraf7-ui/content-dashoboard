@@ -548,6 +548,7 @@ tr:hover td{background:var(--sur2)}
             </div>
           </div>
           <!-- Presets -->
+          <button class="btn" id="org-view-today" onclick="setOrgPeriod('today',this)" style="font-size:11px">Today</button>
           <button class="btn" id="org-view-week" onclick="setOrgPeriod('week',this)" style="font-size:11px">This Week</button>
           <button class="btn btnp" id="org-view-month" onclick="setOrgPeriod('month',this)" style="font-size:11px">This Month</button>
           <button class="btn" id="org-view-lastweek" onclick="setOrgPeriod('lastweek',this)" style="font-size:11px">Last Week</button>
@@ -3094,7 +3095,7 @@ function orgToDate()   { const i=document.getElementById('org-to-date');   retur
 
 function onOrgDateChange() {
   // clear preset highlight when user manually edits dates
-  document.querySelectorAll('#org-view-week,#org-view-month,#org-view-lastweek,#org-view-lastmonth')
+  document.querySelectorAll('#org-view-today,#org-view-week,#org-view-month,#org-view-lastweek,#org-view-lastmonth')
     .forEach(b => b.classList.remove('btnp'));
   renderOrgView();
 }
@@ -3103,13 +3104,14 @@ function setOrgPeriod(p, el) {
   ORG_PERIOD = p;
   const today = todayISO();
   let from, to;
-  if      (p==='week')      { from=_mondayOf(today);            to=today; }
+  if      (p==='today')     { from=today;                        to=today; }
+  else if (p==='week')      { from=_mondayOf(today);            to=today; }
   else if (p==='month')     { from=_firstOfMonth(today);        to=today; }
   else if (p==='lastweek')  { const m=_mondayOf(today); from=_isoAdd(m,-7); to=_isoAdd(m,-1); }
   else if (p==='lastmonth') { const pm=_prevMonthISO(today); from=pm; to=_lastOfMonth(pm); }
   const fi=document.getElementById('org-from-date'), ti=document.getElementById('org-to-date');
   if(fi) fi.value=from; if(ti) ti.value=to;
-  document.querySelectorAll('#org-view-week,#org-view-month,#org-view-lastweek,#org-view-lastmonth')
+  document.querySelectorAll('#org-view-today,#org-view-week,#org-view-month,#org-view-lastweek,#org-view-lastmonth')
     .forEach(b => b.classList.remove('btnp'));
   if(el) el.classList.add('btnp');
   renderOrgView();
