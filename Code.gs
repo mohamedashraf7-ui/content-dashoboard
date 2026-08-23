@@ -1144,36 +1144,34 @@ function getMainRequestData(dateFrom, dateTo) {
     var TEAM_NAMES = ['Mohamed Gadallah','Seliem Mohamed','Omar Elattar','Mahmoud Amin'];
     var byAgent = {};
     TEAM_NAMES.forEach(function(n){
-      byAgent[n] = { done:0, rejected:0, cancelled:0, pendingContent:0, pendingRegional:0, total:0 };
+      byAgent[n] = { done:0, cancelled:0, pendingContent:0, pendingRegional:0, total:0 };
     });
-    var totals = { done:0, rejected:0, cancelled:0, pendingContent:0, pendingRegional:0, total:0 };
+    var totals = { done:0, cancelled:0, pendingContent:0, pendingRegional:0, total:0 };
 
     rows.forEach(function(r){
       var a = byAgent[r.owner];
-      if (!a) { byAgent[r.owner] = { done:0, rejected:0, cancelled:0, pendingContent:0, pendingRegional:0, total:0 }; a = byAgent[r.owner]; }
+      if (!a) { byAgent[r.owner] = { done:0, cancelled:0, pendingContent:0, pendingRegional:0, total:0 }; a = byAgent[r.owner]; }
       var s = r.status.toLowerCase();
-      if      (s === 'done')                            { a.done++;           totals.done++;           }
-      else if (s === 'rejected')                        { a.rejected++;       totals.rejected++;       }
-      else if (s === 'canceled' || s === 'cancelled')   { a.cancelled++;      totals.cancelled++;      }
-      else if (s === 'pending content')                 { a.pendingContent++; totals.pendingContent++; }
-      else if (s === 'pending regional')                { a.pendingRegional++;totals.pendingRegional++;}
+      if      (s === 'done')                                                      { a.done++;           totals.done++;           }
+      else if (s === 'canceled' || s === 'cancelled' || s === 'rejected')         { a.cancelled++;      totals.cancelled++;      }
+      else if (s === 'pending content')                                           { a.pendingContent++; totals.pendingContent++; }
+      else if (s === 'pending regional')                                          { a.pendingRegional++;totals.pendingRegional++;}
       a.total++; totals.total++;
     });
 
     // Day-over-day: group by date (team totals) + per-agent daily counts
-    var byDate           = {};  // { '2026-08-20': { done, rejected, ... , total } }
+    var byDate           = {};  // { '2026-08-20': { done, cancelled, ... , total } }
     var byAgentDate      = {};  // { 'Mohamed Gadallah': { '2026-08-20': assigned count } }
     var byAgentActionDate = {}; // { 'Mohamed Gadallah': { '2026-08-20': action count } }
 
     rows.forEach(function(r){
       var s = r.status.toLowerCase();
       // Team-level byDate
-      if (!byDate[r.date]) byDate[r.date] = { done:0, rejected:0, cancelled:0, pendingContent:0, pendingRegional:0, total:0 };
-      if      (s === 'done')                            byDate[r.date].done++;
-      else if (s === 'rejected')                        byDate[r.date].rejected++;
-      else if (s === 'canceled' || s === 'cancelled')   byDate[r.date].cancelled++;
-      else if (s === 'pending content')                 byDate[r.date].pendingContent++;
-      else if (s === 'pending regional')                byDate[r.date].pendingRegional++;
+      if (!byDate[r.date]) byDate[r.date] = { done:0, cancelled:0, pendingContent:0, pendingRegional:0, total:0 };
+      if      (s === 'done')                                                    byDate[r.date].done++;
+      else if (s === 'canceled' || s === 'cancelled' || s === 'rejected')       byDate[r.date].cancelled++;
+      else if (s === 'pending content')                                         byDate[r.date].pendingContent++;
+      else if (s === 'pending regional')                                        byDate[r.date].pendingRegional++;
       byDate[r.date].total++;
 
       // Per-agent assigned per day (from AA)

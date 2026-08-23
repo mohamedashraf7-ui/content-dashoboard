@@ -1193,10 +1193,6 @@ function renderMRSection() {
       <div style="font-size:22px;font-weight:800;color:#16a34a">${t.done||0}</div>
       <div style="font-size:10px;color:#16a34a;font-weight:600">DONE</div>
     </div>
-    <div style="background:#fee2e2;border-radius:var(--rs);padding:10px 16px;text-align:center;min-width:80px">
-      <div style="font-size:22px;font-weight:800;color:#dc2626">${t.rejected||0}</div>
-      <div style="font-size:10px;color:#dc2626;font-weight:600">REJECTED</div>
-    </div>
     <div style="background:#fef9c3;border-radius:var(--rs);padding:10px 16px;text-align:center;min-width:80px">
       <div style="font-size:22px;font-weight:800;color:#ca8a04">${t.pendingContent||0}</div>
       <div style="font-size:10px;color:#ca8a04;font-weight:600">PEND. CONTENT</div>
@@ -1220,7 +1216,6 @@ function renderMRSection() {
           <th style="text-align:left;padding:7px 10px;font-size:10px;font-weight:700;color:var(--mu)">Agent</th>
           <th style="text-align:center;padding:7px 8px;font-size:10px;font-weight:700;color:var(--mu)">Assigned</th>
           <th style="text-align:center;padding:7px 8px;font-size:10px;font-weight:700;color:#16a34a">Done</th>
-          <th style="text-align:center;padding:7px 8px;font-size:10px;font-weight:700;color:#dc2626">Rejected</th>
           <th style="text-align:center;padding:7px 8px;font-size:10px;font-weight:700;color:#ca8a04">Pend. Content</th>
           <th style="text-align:center;padding:7px 8px;font-size:10px;font-weight:700;color:#7c3aed">Pend. Regional</th>
           <th style="text-align:center;padding:7px 8px;font-size:10px;font-weight:700;color:var(--mu)">Cancelled</th>
@@ -1229,7 +1224,7 @@ function renderMRSection() {
       </thead>
       <tbody>
         ${TEAM.map((nm,i) => {
-          const a   = ba[nm] || {done:0,rejected:0,cancelled:0,pendingContent:0,pendingRegional:0,total:0};
+          const a   = ba[nm] || {done:0,cancelled:0,pendingContent:0,pendingRegional:0,total:0};
           const pct = a.total ? Math.round(a.done/a.total*100) : 0;
           const col = pct>=80?'#16a34a':pct>=50?'#ca8a04':'#dc2626';
           return `<tr style="border-top:1px solid var(--bor)">
@@ -1242,7 +1237,6 @@ function renderMRSection() {
             </td>
             <td style="text-align:center;font-weight:800;color:var(--or);font-size:14px">${a.total}</td>
             <td style="text-align:center;font-weight:700;color:#16a34a">${a.done}</td>
-            <td style="text-align:center;color:#dc2626">${a.rejected||0}</td>
             <td style="text-align:center;color:#ca8a04">${a.pendingContent||0}</td>
             <td style="text-align:center;color:#7c3aed">${a.pendingRegional||0}</td>
             <td style="text-align:center;color:var(--mu)">${a.cancelled||0}</td>
@@ -1253,7 +1247,6 @@ function renderMRSection() {
           <td style="padding:7px 10px;font-weight:700;font-size:11px;color:var(--mu)">Team Total</td>
           <td style="text-align:center;font-weight:800;color:var(--or)">${t.total||0}</td>
           <td style="text-align:center;font-weight:700;color:#16a34a">${t.done||0}</td>
-          <td style="text-align:center;color:#dc2626">${t.rejected||0}</td>
           <td style="text-align:center;color:#ca8a04">${t.pendingContent||0}</td>
           <td style="text-align:center;color:#7c3aed">${t.pendingRegional||0}</td>
           <td style="text-align:center;color:var(--mu)">${t.cancelled||0}</td>
@@ -1266,7 +1259,7 @@ function renderMRSection() {
   <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px">`;
 
   TEAM.forEach(function(nm) {
-    const a = ba[nm] || {done:0,rejected:0,cancelled:0,pendingContent:0,pendingRegional:0,total:0};
+    const a = ba[nm] || {done:0,cancelled:0,pendingContent:0,pendingRegional:0,total:0};
     const pct     = a.total ? Math.round(a.done/a.total*100) : 0;
     const pending = (a.pendingContent||0) + (a.pendingRegional||0);
     const col     = pct>=80?'var(--gr)':pct>=50?'var(--or)':'var(--re)';
@@ -1287,17 +1280,16 @@ function renderMRSection() {
           <div style="font-weight:700;color:#16a34a">${a.done}</div>
           <div style="color:#16a34a">Done</div>
         </div>
-        <div style="background:#fee2e2;border-radius:4px;padding:3px 0">
-          <div style="font-weight:700;color:#dc2626">${a.rejected||0}</div>
-          <div style="color:#dc2626">Rejected</div>
-        </div>
         <div style="background:#ede9fe;border-radius:4px;padding:3px 0">
           <div style="font-weight:700;color:#7c3aed">${a.pendingRegional||0}</div>
           <div style="color:#7c3aed">Pend. Regional</div>
         </div>
+        <div style="background:var(--bg2);border-radius:4px;padding:3px 0;border:1px solid var(--bor)">
+          <div style="font-weight:700;color:var(--mu)">${a.cancelled||0}</div>
+          <div style="color:var(--mu)">Cancelled</div>
+        </div>
       </div>
       ${a.pendingContent>0?`<div style="margin-top:4px;font-size:9px;color:#ca8a04;text-align:center">⏳ ${a.pendingContent} Pending Content</div>`:''}
-      ${a.cancelled>0?`<div style="margin-top:2px;font-size:9px;color:var(--mu);text-align:center">✕ ${a.cancelled} Cancelled</div>`:''}
     </div>`;
   });
   html += '</div>';
@@ -1377,7 +1369,7 @@ function renderMRAgentSection(agentName) {
     setTimeout(function(){ if(MR_DATA&&MR_DATA.byAgent) renderMRAgentSection(agentName); }, 2500);
     return;
   }
-  const a   = (MR_DATA.byAgent || {})[agentName] || {done:0,rejected:0,cancelled:0,pendingContent:0,pendingRegional:0,total:0};
+  const a   = (MR_DATA.byAgent || {})[agentName] || {done:0,cancelled:0,pendingContent:0,pendingRegional:0,total:0};
   const pct = a.total ? Math.round(a.done/a.total*100) : 0;
   const col = pct>=80?'var(--gr)':pct>=50?'var(--or)':'var(--re)';
 
@@ -1396,9 +1388,9 @@ function renderMRAgentSection(agentName) {
       <div style="font-size:22px;font-weight:800;color:#16a34a">${a.done}</div>
       <div style="font-size:10px;color:#16a34a;font-weight:600">DONE</div>
     </div>
-    <div style="background:#fee2e2;border-radius:var(--rs);padding:10px;text-align:center">
-      <div style="font-size:22px;font-weight:800;color:#dc2626">${a.rejected||0}</div>
-      <div style="font-size:10px;color:#dc2626;font-weight:600">REJECTED</div>
+    <div style="background:var(--bg2);border-radius:var(--rs);padding:10px;text-align:center;border:1px solid var(--bor)">
+      <div style="font-size:22px;font-weight:800;color:var(--mu)">${a.cancelled||0}</div>
+      <div style="font-size:10px;color:var(--mu);font-weight:600">CANCELLED</div>
     </div>
     <div style="background:#ede9fe;border-radius:var(--rs);padding:10px;text-align:center">
       <div style="font-size:22px;font-weight:800;color:#7c3aed">${a.pendingRegional||0}</div>
