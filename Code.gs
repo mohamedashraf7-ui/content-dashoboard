@@ -765,7 +765,7 @@ function _buildProgressMessage() {
 
   var ownerIdx  = hdr.indexOf('content owner');
   var statusIdx = hdr.indexOf('status');
-  var endIdx    = hdr.indexOf('end date');
+  var endIdx    = hdr.indexOf('categorization date') >= 0 ? hdr.indexOf('categorization date') : hdr.indexOf('end date');
   var startIdx  = hdr.indexOf('start date');
 
   if (ownerIdx < 0) {
