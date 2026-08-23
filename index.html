@@ -1181,7 +1181,9 @@ function renderMRSection() {
   // Collect daily totals across all dates (sorted)
   const allDates = Object.keys(MR_DATA.byDate||{}).sort();
   const last14   = allDates.slice(-14);
-  const bad      = MR_DATA.byAgentDate || {};
+  const bad      = MR_DATA.byAgentDate         || {};  // assigned (AA)
+  const brd      = MR_DATA.byAgentReceivedDate || {};  // received (Timestamp)
+  const aad_ov   = MR_DATA.byAgentActionDate   || {};  // done (AB)
 
   // Team total summary pills
   const pending = (t.pendingContent||0) + (t.pendingRegional||0);
@@ -1300,7 +1302,8 @@ function renderMRSection() {
 
   // ── Daily received + done table (last 14 days) ─────────────────────────
   if (last14.length) {
-    const aad = MR_DATA.byAgentActionDate || {};  // done per day (col AB)
+    const aad     = MR_DATA.byAgentActionDate   || {};  // done (col AB)
+    const brdOv   = MR_DATA.byAgentReceivedDate || {};  // received (Timestamp)
     const today14 = todayISO();
 
     html += `<div style="margin-top:16px">
@@ -1309,8 +1312,9 @@ function renderMRSection() {
           📅 Onground Per Day — Last ${last14.length} days
         </div>
         <div style="display:flex;gap:10px;font-size:10px;color:var(--mu)">
-          <span><span style="display:inline-block;width:8px;height:8px;background:var(--or);border-radius:2px;margin-right:3px"></span>Received (col AA)</span>
-          <span><span style="display:inline-block;width:8px;height:8px;background:#16a34a;border-radius:2px;margin-right:3px"></span>Done (col AB)</span>
+          <span><span style="display:inline-block;width:8px;height:8px;background:#3b82f6;border-radius:2px;margin-right:3px"></span>Received</span>
+          <span><span style="display:inline-block;width:8px;height:8px;background:var(--or);border-radius:2px;margin-right:3px"></span>Assigned</span>
+          <span><span style="display:inline-block;width:8px;height:8px;background:#16a34a;border-radius:2px;margin-right:3px"></span>Done</span>
         </div>
       </div>
       <div style="overflow-x:auto">
@@ -1321,24 +1325,28 @@ function renderMRSection() {
               ${last14.map(d => {
                 const lbl = new Date(d+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',day:'numeric',month:'short'});
                 const isT = d === today14;
-                return `<th colspan="2" style="text-align:center;padding:4px 6px;font-size:9px;color:${isT?'var(--or)':'var(--mu)'};font-weight:${isT?700:600};white-space:nowrap;${isT?'background:var(--or2);border-radius:4px':''}">${lbl}</th>`;
+                return `<th colspan="3" style="text-align:center;padding:4px 6px;font-size:9px;color:${isT?'var(--or)':'var(--mu)'};font-weight:${isT?700:600};white-space:nowrap;${isT?'background:var(--or2);border-radius:4px':''}">${lbl}</th>`;
               }).join('')}
-              <th colspan="2" style="text-align:center;padding:4px 8px;font-size:10px;color:var(--mu);font-weight:700">Total</th>
+              <th colspan="3" style="text-align:center;padding:4px 8px;font-size:10px;color:var(--mu);font-weight:700">Total</th>
             </tr>
             <tr>
-              ${last14.flatMap(d => [
-                `<th style="text-align:center;font-size:9px;color:var(--or);padding:2px 3px;font-weight:600">Rcv</th>`,
+              ${last14.flatMap(() => [
+                `<th style="text-align:center;font-size:9px;color:#3b82f6;padding:2px 3px;font-weight:600">Rcv</th>`,
+                `<th style="text-align:center;font-size:9px;color:var(--or);padding:2px 3px;font-weight:600">Asgn</th>`,
                 `<th style="text-align:center;font-size:9px;color:#16a34a;padding:2px 3px;font-weight:600">Done</th>`
               ]).join('')}
-              <th style="text-align:center;font-size:9px;color:var(--or);padding:2px 3px;font-weight:700">Rcv</th>
+              <th style="text-align:center;font-size:9px;color:#3b82f6;padding:2px 3px;font-weight:700">Rcv</th>
+              <th style="text-align:center;font-size:9px;color:var(--or);padding:2px 3px;font-weight:700">Asgn</th>
               <th style="text-align:center;font-size:9px;color:#16a34a;padding:2px 3px;font-weight:700">Done</th>
             </tr>
           </thead>
           <tbody>
             ${TEAM.map(nm => {
-              const agDates  = bad[nm] || {};
-              const actDates = aad[nm] || {};
-              const totRcv  = last14.reduce((s,d)=>s+(agDates[d]||0),0);
+              const rcvDates  = brdOv[nm] || {};
+              const asgnDates = bad[nm]   || {};
+              const actDates  = aad[nm]   || {};
+              const totRcv  = last14.reduce((s,d)=>s+(rcvDates[d]||0),0);
+              const totAsgn = last14.reduce((s,d)=>s+(asgnDates[d]||0),0);
               const totDone = last14.reduce((s,d)=>s+(actDates[d]||0),0);
               return `<tr style="border-top:1px solid var(--bor)">
                 <td style="padding:5px 8px;white-space:nowrap">
@@ -1348,43 +1356,48 @@ function renderMRSection() {
                   </div>
                 </td>
                 ${last14.flatMap(d => {
-                  const rcv  = agDates[d]  || 0;
-                  const done = actDates[d] || 0;
+                  const rcv  = rcvDates[d]  || 0;
+                  const asgn = asgnDates[d] || 0;
+                  const done = actDates[d]  || 0;
                   const isT  = d === today14;
                   const bg   = isT ? 'var(--sur2)' : 'transparent';
-                  const dCol = rcv && done>=rcv ? '#16a34a' : done>0 ? 'var(--or)' : 'var(--di)';
+                  const dCol = asgn && done>=asgn ? '#16a34a' : done>0 ? 'var(--or)' : 'var(--di)';
+                  const cell = (n,col) => n>0
+                    ? `<span style="font-size:11px;font-weight:700;color:${col}">${n}</span>`
+                    : `<span style="color:var(--di);font-size:10px">—</span>`;
                   return [
-                    `<td style="text-align:center;padding:4px 3px;background:${bg}">
-                      ${rcv>0?`<span style="font-size:11px;font-weight:700;color:var(--or)">${rcv}</span>`:`<span style="color:var(--di);font-size:10px">—</span>`}
-                    </td>`,
-                    `<td style="text-align:center;padding:4px 3px;background:${bg}">
-                      ${done>0?`<span style="font-size:11px;font-weight:700;color:${dCol}">${done}</span>`:`<span style="color:var(--di);font-size:10px">—</span>`}
-                    </td>`
+                    `<td style="text-align:center;padding:4px 2px;background:${bg}">${cell(rcv,'#3b82f6')}</td>`,
+                    `<td style="text-align:center;padding:4px 2px;background:${bg}">${cell(asgn,'var(--or)')}</td>`,
+                    `<td style="text-align:center;padding:4px 2px;background:${bg}">${cell(done,dCol)}</td>`
                   ];
                 }).join('')}
-                <td style="text-align:center;padding:5px 6px;font-weight:800;color:var(--or)">${totRcv}</td>
-                <td style="text-align:center;padding:5px 6px;font-weight:800;color:#16a34a">${totDone}</td>
+                <td style="text-align:center;padding:5px 5px;font-weight:800;color:#3b82f6">${totRcv}</td>
+                <td style="text-align:center;padding:5px 5px;font-weight:800;color:var(--or)">${totAsgn}</td>
+                <td style="text-align:center;padding:5px 5px;font-weight:800;color:#16a34a">${totDone}</td>
               </tr>`;
             }).join('')}
             <tr style="border-top:2px solid var(--bor);background:var(--sur2)">
               <td style="padding:5px 8px;font-size:10px;font-weight:700;color:var(--mu)">Team</td>
               ${last14.flatMap(d => {
-                const rcv  = TEAM.reduce((s,nm)=>s+(bad[nm]&&bad[nm][d]||0),0);
+                const rcv  = TEAM.reduce((s,nm)=>s+(brdOv[nm]&&brdOv[nm][d]||0),0);
+                const asgn = TEAM.reduce((s,nm)=>s+(bad[nm]&&bad[nm][d]||0),0);
                 const done = TEAM.reduce((s,nm)=>s+(aad[nm]&&aad[nm][d]||0),0);
                 const isT  = d === today14;
                 const bg   = isT ? 'var(--or2)' : 'transparent';
                 return [
-                  `<td style="text-align:center;padding:4px 3px;background:${bg}"><span style="font-weight:700;font-size:10px;color:${rcv?'var(--or)':'var(--di)'}">${rcv||'—'}</span></td>`,
-                  `<td style="text-align:center;padding:4px 3px;background:${bg}"><span style="font-weight:700;font-size:10px;color:${done?'#16a34a':'var(--di)'}">${done||'—'}</span></td>`
+                  `<td style="text-align:center;padding:4px 2px;background:${bg}"><span style="font-weight:700;font-size:10px;color:${rcv?'#3b82f6':'var(--di)'}">${rcv||'—'}</span></td>`,
+                  `<td style="text-align:center;padding:4px 2px;background:${bg}"><span style="font-weight:700;font-size:10px;color:${asgn?'var(--or)':'var(--di)'}">${asgn||'—'}</span></td>`,
+                  `<td style="text-align:center;padding:4px 2px;background:${bg}"><span style="font-weight:700;font-size:10px;color:${done?'#16a34a':'var(--di)'}">${done||'—'}</span></td>`
                 ];
               }).join('')}
+              <td style="text-align:center;font-weight:800;color:#3b82f6">${last14.reduce((s,d)=>s+TEAM.reduce((ss,nm)=>ss+(brdOv[nm]&&brdOv[nm][d]||0),0),0)}</td>
               <td style="text-align:center;font-weight:800;color:var(--or)">${last14.reduce((s,d)=>s+TEAM.reduce((ss,nm)=>ss+(bad[nm]&&bad[nm][d]||0),0),0)}</td>
               <td style="text-align:center;font-weight:800;color:#16a34a">${last14.reduce((s,d)=>s+TEAM.reduce((ss,nm)=>ss+(aad[nm]&&aad[nm][d]||0),0),0)}</td>
             </tr>
           </tbody>
         </table>
       </div>
-      <div style="font-size:10px;color:var(--di);margin-top:6px">Received = assigned date (col AA) · Done = action date (col AB)</div>
+      <div style="font-size:10px;color:var(--di);margin-top:6px">Received = form Timestamp · Assigned = col AA · Done = col AB</div>
     </div>`;
   }
 
@@ -2144,9 +2157,11 @@ function renderAgentOverview(){
   document.getElementById('agt-day-lbl').textContent = `📅 ${day}`;
 
   // ── Onground helpers ────────────────────────────────────────────────────
-  const bad = (MR_DATA && MR_DATA.byAgentDate)      || {};  // assigned per day (AA)
-  const aad = (MR_DATA && MR_DATA.byAgentActionDate) || {};  // actions per day (AB)
-  const mrBA = (MR_DATA && MR_DATA.byAgent)          || {};
+  const bad  = (MR_DATA && MR_DATA.byAgentDate)         || {};  // assigned (AA)
+  const aad  = (MR_DATA && MR_DATA.byAgentActionDate)   || {};  // done (AB)
+  const brd  = (MR_DATA && MR_DATA.byAgentReceivedDate) || {};  // received (Timestamp)
+  const mrBA = (MR_DATA && MR_DATA.byAgent)             || {};
+  const mrRcv  = (agent, date) => (brd[agent] && brd[agent][date]) || 0;
   const mrCount = (agent, date) => (bad[agent] && bad[agent][date]) || 0;
   const mrAct   = (agent, date) => (aad[agent] && aad[agent][date]) || 0;
 
@@ -2202,15 +2217,20 @@ function renderAgentOverview(){
       <!-- Onground today -->
       <div style="background:var(--sur2);border-radius:var(--rs);padding:8px 10px">
         <div style="font-size:10px;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">📋 Onground</div>
-        <div style="display:flex;gap:10px;align-items:center">
+        <div style="display:flex;gap:8px;align-items:center">
           <div style="text-align:center">
-            <div style="font-size:22px;font-weight:800;color:var(--or);line-height:1">${ogAss}</div>
+            <div style="font-size:18px;font-weight:800;color:#3b82f6;line-height:1">${mrRcv(o,today)}</div>
+            <div style="font-size:9px;color:var(--mu)">received</div>
+          </div>
+          <div style="font-size:14px;color:var(--di)">→</div>
+          <div style="text-align:center">
+            <div style="font-size:18px;font-weight:800;color:var(--or);line-height:1">${ogAss}</div>
             <div style="font-size:9px;color:var(--mu)">assigned</div>
           </div>
-          <div style="font-size:18px;color:var(--di)">→</div>
+          <div style="font-size:14px;color:var(--di)">→</div>
           <div style="text-align:center">
-            <div style="font-size:22px;font-weight:800;color:${ogCol};line-height:1">${ogAct}</div>
-            <div style="font-size:9px;color:var(--mu)">actions</div>
+            <div style="font-size:18px;font-weight:800;color:${ogCol};line-height:1">${ogAct}</div>
+            <div style="font-size:9px;color:var(--mu)">done</div>
           </div>
           ${ogAss>0?`<div style="margin-left:auto;font-size:13px;font-weight:800;color:${ogCol}">${ogPct}%</div>`:''}
         </div>
@@ -2226,7 +2246,7 @@ function renderAgentOverview(){
     <div class="card" style="margin-top:14px">
       <div class="sh" style="margin-bottom:10px">
         <div class="stit">📋 Onground — Daily Tracker</div>
-        <div style="font-size:10px;color:var(--mu)">Assigned (col AA) · Actions done (col AB) · Last 7 days</div>
+        <div style="font-size:10px;color:var(--mu)">Received (Timestamp) · Assigned (AA) · Done (AB) · Last 7 days</div>
       </div>
       <div style="overflow-x:auto">
         <table style="min-width:520px;border-collapse:collapse">
@@ -2235,18 +2255,24 @@ function renderAgentOverview(){
             ${last7.map(d=>{
               const lbl=new Date(d+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',day:'numeric',month:'short'});
               const isT=d===today;
-              return `<th colspan="2" style="text-align:center;padding:5px 8px;font-size:10px;color:${isT?'var(--or)':'var(--mu)'};${isT?'background:var(--or2);border-radius:4px':''}">${lbl}</th>`;
+              return `<th colspan="3" style="text-align:center;padding:5px 8px;font-size:10px;color:${isT?'var(--or)':'var(--mu)'};${isT?'background:var(--or2);border-radius:4px':''}">${lbl}</th>`;
             }).join('')}
-            <th colspan="2" style="text-align:center;padding:5px 8px;font-size:10px;color:var(--mu)">7-day Total</th>
+            <th colspan="3" style="text-align:center;padding:5px 8px;font-size:10px;color:var(--mu)">7-day Total</th>
           </tr>
           <tr>
             <th></th>
-            ${last7.flatMap(()=>['<th style="text-align:center;font-size:9px;color:var(--or);padding:2px 4px">Asgn</th>','<th style="text-align:center;font-size:9px;color:#16a34a;padding:2px 4px">Done</th>']).join('')}
-            <th style="text-align:center;font-size:9px;color:var(--or);padding:2px 4px">Asgn</th>
-            <th style="text-align:center;font-size:9px;color:#16a34a;padding:2px 4px">Done</th>
+            ${last7.flatMap(()=>[
+              '<th style="text-align:center;font-size:9px;color:#3b82f6;padding:2px 3px">Rcv</th>',
+              '<th style="text-align:center;font-size:9px;color:var(--or);padding:2px 3px">Asgn</th>',
+              '<th style="text-align:center;font-size:9px;color:#16a34a;padding:2px 3px">Done</th>'
+            ]).join('')}
+            <th style="text-align:center;font-size:9px;color:#3b82f6;padding:2px 3px">Rcv</th>
+            <th style="text-align:center;font-size:9px;color:var(--or);padding:2px 3px">Asgn</th>
+            <th style="text-align:center;font-size:9px;color:#16a34a;padding:2px 3px">Done</th>
           </tr></thead>
           <tbody>
             ${TEAM.map(o=>{
+              const totRcv = last7.reduce((s,d)=>s+mrRcv(o,d),0);
               const totAss = last7.reduce((s,d)=>s+mrCount(o,d),0);
               const totAct = last7.reduce((s,d)=>s+mrAct(o,d),0);
               return `<tr style="border-top:1px solid var(--bor)">
@@ -2257,15 +2283,18 @@ function renderAgentOverview(){
                   </div>
                 </td>
                 ${last7.flatMap(d=>{
-                  const a=mrCount(o,d), act=mrAct(o,d);
+                  const rcv=mrRcv(o,d), a=mrCount(o,d), act=mrAct(o,d);
                   const isT=d===today;
-                  const aBg=isT?'var(--or2)':'transparent';
+                  const bg=isT?'var(--sur2)':'transparent';
                   const actCol=a&&act>=a?'#16a34a':act>0?'var(--or)':'var(--di)';
+                  const cell=(n,col)=>n>0?`<span style="font-size:11px;font-weight:700;color:${col}">${n}</span>`:'<span style="color:var(--di);font-size:10px">—</span>';
                   return [
-                    `<td style="text-align:center;padding:4px;background:${aBg}">${a>0?`<span style="font-size:11px;font-weight:700;color:var(--or)">${a}</span>`:'<span style="color:var(--di);font-size:10px">—</span>'}</td>`,
-                    `<td style="text-align:center;padding:4px;background:${aBg}">${act>0?`<span style="font-size:11px;font-weight:700;color:${actCol}">${act}</span>`:'<span style="color:var(--di);font-size:10px">—</span>'}</td>`
+                    `<td style="text-align:center;padding:4px 2px;background:${bg}">${cell(rcv,'#3b82f6')}</td>`,
+                    `<td style="text-align:center;padding:4px 2px;background:${bg}">${cell(a,'var(--or)')}</td>`,
+                    `<td style="text-align:center;padding:4px 2px;background:${bg}">${cell(act,actCol)}</td>`
                   ];
                 }).join('')}
+                <td style="text-align:center;font-weight:800;color:#3b82f6">${totRcv}</td>
                 <td style="text-align:center;font-weight:800;color:var(--or)">${totAss}</td>
                 <td style="text-align:center;font-weight:800;color:#16a34a">${totAct}</td>
               </tr>`;
@@ -2273,14 +2302,18 @@ function renderAgentOverview(){
             <tr style="border-top:2px solid var(--bor);background:var(--sur2)">
               <td style="padding:5px 8px;font-size:10px;font-weight:700;color:var(--mu)">Team</td>
               ${last7.flatMap(d=>{
+                const rcv=TEAM.reduce((s,o)=>s+mrRcv(o,d),0);
                 const a=TEAM.reduce((s,o)=>s+mrCount(o,d),0);
                 const act=TEAM.reduce((s,o)=>s+mrAct(o,d),0);
                 const isT=d===today;
+                const bg=isT?'var(--or2)':'transparent';
                 return [
-                  `<td style="text-align:center;padding:4px;${isT?'background:var(--or2)':''}">${a>0?`<span style="font-weight:700;color:var(--or)">${a}</span>`:'—'}</td>`,
-                  `<td style="text-align:center;padding:4px;${isT?'background:var(--or2)':''}">${act>0?`<span style="font-weight:700;color:#16a34a">${act}</span>`:'—'}</td>`
+                  `<td style="text-align:center;padding:4px 2px;background:${bg}"><span style="font-weight:700;color:${rcv?'#3b82f6':'var(--di)'}">${rcv||'—'}</span></td>`,
+                  `<td style="text-align:center;padding:4px 2px;background:${bg}"><span style="font-weight:700;color:${a?'var(--or)':'var(--di)'}">${a||'—'}</span></td>`,
+                  `<td style="text-align:center;padding:4px 2px;background:${bg}"><span style="font-weight:700;color:${act?'#16a34a':'var(--di)'}">${act||'—'}</span></td>`
                 ];
               }).join('')}
+              <td style="text-align:center;font-weight:800;color:#3b82f6">${TEAM.reduce((s,o)=>s+last7.reduce((ss,d)=>ss+mrRcv(o,d),0),0)}</td>
               <td style="text-align:center;font-weight:800;color:var(--or)">${TEAM.reduce((s,o)=>s+last7.reduce((ss,d)=>ss+mrCount(o,d),0),0)}</td>
               <td style="text-align:center;font-weight:800;color:#16a34a">${TEAM.reduce((s,o)=>s+last7.reduce((ss,d)=>ss+mrAct(o,d),0),0)}</td>
             </tr>

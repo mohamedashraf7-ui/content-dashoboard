@@ -905,12 +905,18 @@ var MR_NAME_MAP  = {
 };
 
 // Column indices (0-based) in Main request sheet
-var MR_COL_TIMESTAMP    = 0;   // A – form submission time
+// Header: Timestamp(0) MonthName(1) WeekNo(2) ChainName(3) RequestType(4)
+//         Barcode(5) SKU(6) ItemName(7) Explain(8) Email(9) PicUpload(10)
+//         FileUpload(11) Price(12) BranchName(13) Weight(14) DelistReason(15)
+//         NewBarcode(16) NewSKU(17) NewItemName(18) Status(19) Owner(20)
+//         Reason(21) Comment(22) InternalComment(23) EmailStatus(24)
+//         LastEmailSentDate(25) AssignedDate(26=AA) ActionDate(27=AB)
+var MR_COL_TIMESTAMP    = 0;   // A – form submission time (= received date)
 var MR_COL_CHAIN        = 3;   // D – Chain Name
 var MR_COL_TYPE         = 4;   // E – Request Type
-var MR_COL_STATUS       = 20;  // U – Done / Canceled / Pending Regional …
-var MR_COL_OWNER        = 21;  // V – Seleem / Ashraf / Omar / Waheed  (1-indexed col 22)
-var MR_COL_EMAIL_STATUS = 25;  // Z – done / pending regional
+var MR_COL_STATUS       = 19;  // T – Done / Canceled / Pending Regional …
+var MR_COL_OWNER        = 20;  // U – Seleem / Ashraf / Omar / Waheed
+var MR_COL_EMAIL_STATUS = 24;  // Y – email done / pending regional
 var MR_COL_ASSIGNED_AT  = 26;  // AA – Assigned date ★ written by auto-assign / on-edit trigger
 var MR_COL_ACTION_DATE  = 27;  // AB – Action date (read-only — set by the processing agent)
 
@@ -1108,36 +1114,54 @@ function getMainRequestData(dateFrom, dateTo) {
     var rows = [];
 
     for (var i = 1; i < data.length; i++) {
-      var row      = data[i];
-      var owner    = String(row[MR_COL_OWNER] || '').trim();
-      if (!owner) continue;                              // unassigned — skip entirely
+      var row    = data[i];
+      var owner  = String(row[MR_COL_OWNER] || '').trim();
+      var status = String(row[MR_COL_STATUS] || '').trim();
+      var chain  = String(row[chainIdx]      || '').trim();
 
-      // ── Assignment date: AA (ASSIGNED_AT) → submission Timestamp fallback ──
+      // ── Received date: always from Timestamp (col A) ─────────────────────
+      var tsRaw = row[MR_COL_TIMESTAMP];
+      var receivedISO = '';
+      if (tsRaw) {
+        var tsObj = (tsRaw instanceof Date) ? tsRaw : new Date(tsRaw);
+        if (!isNaN(tsObj.getTime())) receivedISO = Utilities.formatDate(tsObj, tz, 'yyyy-MM-dd');
+      }
+
+      // ── Assigned date: col AA (ASSIGNED_AT) ──────────────────────────────
       var assignedRaw = row[MR_COL_ASSIGNED_AT];
-      if (!assignedRaw) assignedRaw = row[MR_COL_TIMESTAMP];
-      if (!assignedRaw) continue;
+      var assignedISO = '';
+      if (assignedRaw) {
+        var asgObj = (assignedRaw instanceof Date) ? assignedRaw : new Date(assignedRaw);
+        if (!isNaN(asgObj.getTime())) assignedISO = Utilities.formatDate(asgObj, tz, 'yyyy-MM-dd');
+      }
 
-      var dateObj = (assignedRaw instanceof Date) ? assignedRaw : new Date(assignedRaw);
-      if (isNaN(dateObj.getTime())) continue;
-      var dateISO = Utilities.formatDate(dateObj, tz, 'yyyy-MM-dd');
+      // ── Action date: col AB (ACTION_DATE) ────────────────────────────────
+      var actionRaw = row[MR_COL_ACTION_DATE];
+      var actionISO = '';
+      if (actionRaw) {
+        var actObj = (actionRaw instanceof Date) ? actionRaw : new Date(actionRaw);
+        if (!isNaN(actObj.getTime())) actionISO = Utilities.formatDate(actObj, tz, 'yyyy-MM-dd');
+      }
+
+      // Use assigned date (or received) as the "bucket date" for filtering
+      var dateISO = assignedISO || receivedISO;
+      if (!dateISO) continue;
 
       if (dateFrom && dateISO < dateFrom) continue;
       if (dateTo   && dateISO > dateTo)   continue;
 
-      // ── Action date: AB (ACTION_DATE) — may be empty ──
-      var actionRaw = row[MR_COL_ACTION_DATE];
-      var actionISO = '';
-      if (actionRaw) {
-        var aObj = (actionRaw instanceof Date) ? actionRaw : new Date(actionRaw);
-        if (!isNaN(aObj.getTime())) actionISO = Utilities.formatDate(aObj, tz, 'yyyy-MM-dd');
-      }
+      var ownerKey  = owner.toLowerCase();
+      var ownerFull = owner ? (MR_NAME_MAP[ownerKey] || owner) : '';
 
-      var ownerKey = owner.toLowerCase();
-      var ownerFull = MR_NAME_MAP[ownerKey] || owner;
-      var status   = String(row[MR_COL_STATUS]||'').trim();
-      var chain    = String(row[chainIdx]||'').trim();
-
-      rows.push({ date: dateISO, actionDate: actionISO, owner: ownerFull, status: status, chain: chain });
+      rows.push({
+        date:        dateISO,
+        receivedDate: receivedISO,
+        assignedDate: assignedISO,
+        actionDate:   actionISO,
+        owner:        ownerFull,
+        status:       status,
+        chain:        chain
+      });
     }
 
     // Aggregate by agent
@@ -1159,36 +1183,58 @@ function getMainRequestData(dateFrom, dateTo) {
       a.total++; totals.total++;
     });
 
-    // Day-over-day: group by date (team totals) + per-agent daily counts
-    var byDate           = {};  // { '2026-08-20': { done, cancelled, ... , total } }
-    var byAgentDate      = {};  // { 'Mohamed Gadallah': { '2026-08-20': assigned count } }
-    var byAgentActionDate = {}; // { 'Mohamed Gadallah': { '2026-08-20': action count } }
+    // ── Daily breakdowns ──────────────────────────────────────────────────
+    var byDate                = {};  // team-level by assigned/received date
+    var byReceivedDate        = {};  // team total received per day (Timestamp)
+    var byAgentDate           = {};  // per-agent assigned per day (col AA)
+    var byAgentReceivedDate   = {};  // per-agent received per day (Timestamp)
+    var byAgentActionDate     = {};  // per-agent done per day (col AB)
 
-    rows.forEach(function(r){
+    rows.forEach(function(r) {
       var s = r.status.toLowerCase();
-      // Team-level byDate
+
+      // Team-level by assigned/bucket date
       if (!byDate[r.date]) byDate[r.date] = { done:0, cancelled:0, pendingContent:0, pendingRegional:0, total:0 };
-      if      (s === 'done')                                                    byDate[r.date].done++;
-      else if (s === 'canceled' || s === 'cancelled' || s === 'rejected')       byDate[r.date].cancelled++;
-      else if (s === 'pending content')                                         byDate[r.date].pendingContent++;
-      else if (s === 'pending regional')                                        byDate[r.date].pendingRegional++;
+      if      (s === 'done')                                               byDate[r.date].done++;
+      else if (s === 'canceled' || s === 'cancelled' || s === 'rejected')  byDate[r.date].cancelled++;
+      else if (s === 'pending content')                                    byDate[r.date].pendingContent++;
+      else if (s === 'pending regional')                                   byDate[r.date].pendingRegional++;
       byDate[r.date].total++;
 
-      // Per-agent assigned per day (from AA)
-      if (!byAgentDate[r.owner]) byAgentDate[r.owner] = {};
-      if (!byAgentDate[r.owner][r.date]) byAgentDate[r.owner][r.date] = 0;
-      byAgentDate[r.owner][r.date]++;
+      // Team received per day (Timestamp)
+      if (r.receivedDate) {
+        byReceivedDate[r.receivedDate] = (byReceivedDate[r.receivedDate] || 0) + 1;
+      }
 
-      // Per-agent action per day (from AB)
-      if (r.actionDate) {
+      // Per-agent: received per day (Timestamp)
+      if (r.receivedDate && r.owner) {
+        if (!byAgentReceivedDate[r.owner]) byAgentReceivedDate[r.owner] = {};
+        byAgentReceivedDate[r.owner][r.receivedDate] = (byAgentReceivedDate[r.owner][r.receivedDate] || 0) + 1;
+      }
+
+      // Per-agent: assigned per day (col AA)
+      if (r.assignedDate && r.owner) {
+        if (!byAgentDate[r.owner]) byAgentDate[r.owner] = {};
+        byAgentDate[r.owner][r.assignedDate] = (byAgentDate[r.owner][r.assignedDate] || 0) + 1;
+      }
+
+      // Per-agent: done per day (col AB)
+      if (r.actionDate && r.owner) {
         if (!byAgentActionDate[r.owner]) byAgentActionDate[r.owner] = {};
-        if (!byAgentActionDate[r.owner][r.actionDate]) byAgentActionDate[r.owner][r.actionDate] = 0;
-        byAgentActionDate[r.owner][r.actionDate]++;
+        byAgentActionDate[r.owner][r.actionDate] = (byAgentActionDate[r.owner][r.actionDate] || 0) + 1;
       }
     });
 
-    return { byAgent: byAgent, totals: totals, byDate: byDate,
-             byAgentDate: byAgentDate, byAgentActionDate: byAgentActionDate, rowCount: rows.length };
+    return {
+      byAgent:             byAgent,
+      totals:              totals,
+      byDate:              byDate,
+      byReceivedDate:      byReceivedDate,
+      byAgentDate:         byAgentDate,         // assigned (AA)
+      byAgentReceivedDate: byAgentReceivedDate, // received (Timestamp)
+      byAgentActionDate:   byAgentActionDate,   // done (AB)
+      rowCount:            rows.length
+    };
   } catch(e) {
     return { error: e.toString() };
   }
