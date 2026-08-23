@@ -2101,60 +2101,178 @@ function applyF(){
   document.getElementById('fres').innerHTML=`<div class="card" style="overflow:auto">${f.length>300?`<div style="padding:7px 12px;font-size:12px;color:var(--mu);border-bottom:1px solid var(--bor)">Showing 300 of ${f.length.toLocaleString()}</div>`:''}<table><thead><tr><th>End Date</th><th>Start Date</th><th>Open Date</th><th>Case #</th><th>Vendor</th><th>Employee</th><th>Status</th><th>Type</th><th>Comment</th></tr></thead><tbody>${show.map(r=>{const bc=r.status==='Done'?'bd':r.status==='Rejected'?'br':r.status==='Pending Feedback'?'bb':'bp';return`<tr><td style="font-weight:600">${r.endISO||'—'}</td><td style="color:var(--mu)">${r.startISO||'—'}</td><td style="color:var(--mu)">${r.caseOpenISO||'—'}</td><td style="color:var(--mu)">${r.caseNo||'—'}</td><td>${r.vendor||'—'}</td><td><div style="display:flex;align-items:center;gap:6px"><div class="av" style="background:${COLORS[r.owner]||'#888'};width:22px;height:22px;font-size:9px">${ini(r.owner)}</div>${r.owner}</div></td><td><span class="badge ${bc}">${r.status||'—'}</span></td><td style="color:var(--mu)">${r.caseType||'—'}</td><td style="color:var(--mu);font-size:11px;max-width:160px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${r.comment}">${r.comment||'—'}</td></tr>`;}).join('')}</tbody></table></div>`;
 }
 
-// ═══ AGENT: OVERVIEW ═══════════════════════════════════════════════════════
+// ═══ TEAM TODAY — full view (manager + agent) ══════════════════════════════
 function renderAgentOverview(){
-  if(!USER||USER._viewMode!=='agent') return;
+  if(!USER) return;
   document.getElementById('agt-ov-load').style.display='none';
   document.getElementById('agt-ov-body').style.display='block';
 
-  const today=todayISO();
-  const day=new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
-  document.getElementById('agt-day-lbl').textContent=`📅 ${day}`;
+  const today    = todayISO();
+  const yest     = _isoAdd(today,-1);
+  const wkRange  = isoWeekOf(0);
+  const isMe     = (o) => o === USER.agentName;
+  const day      = new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
+  document.getElementById('agt-day-lbl').textContent = `📅 ${day}`;
 
-  // Team grid today
-  const wkRange = isoWeekOf(0);
-  const yesterday = _isoAdd(today, -1);
-  const grid=TEAM.map(o=>{
-    const n=R.filter(r=>isFinished(r)&&r.endISO===today&&r.owner===o).length;
-    const dgt=getAgentTarget(o,today);
-    const pct=Math.min(Math.round(n/dgt*100),100);
-    const col=n>=dgt?'var(--gr)':n>0?'var(--or)':'var(--di)';
-    const isMe=o===USER.agentName;
-    const isProj=(AGENT_MODES[o]||{}).mode==='project';
-    const weekN=R.filter(r=>isFinished(r)&&r.endISO>=wkRange.start&&r.endISO<=wkRange.end&&r.owner===o).length;
-    const weekTgt=dgt*5;
-    const weekPct=Math.min(Math.round(weekN/weekTgt*100),100);
-    const weekCol=weekN>=weekTgt?'var(--gr)':weekN>0?'var(--or)':'var(--di)';
-    return `<div class="card csm" style="${isMe?'border-color:var(--or)':''}">
-      ${isMe?'<div style="font-size:10px;font-weight:700;color:var(--or);margin-bottom:6px">⭐ YOU</div>':''}
-      <div style="display:flex;align-items:center;gap:7px;margin-bottom:8px"><div class="av" style="background:${COLORS[o]};width:28px;height:28px;font-size:10px">${ini(o)}</div><div style="font-size:12px;font-weight:600">${o.split(' ')[0]}</div></div>
-      ${isProj
-        ? `<div style="font-size:22px;font-weight:800;color:var(--or)">${n}</div><div style="font-size:10px;color:var(--mu);margin:2px 0 5px">cases today · 🚀 On Project</div>`
-        : `<div style="font-size:28px;font-weight:800;color:${col}">${n}</div>
-           <div style="font-size:11px;color:var(--mu);margin:2px 0 4px">of ${dgt} today</div>
-           <div class="pbar" style="margin:0 0 6px"><div class="pfill" style="width:${pct}%;background:${n>=dgt?'var(--gr)':'var(--or)'}"></div></div>
-           <div style="font-size:10px;color:var(--mu);margin-bottom:3px">Week: <strong style="color:${weekCol}">${weekN}</strong> / ${weekTgt}</div>
-           <div class="pbar" style="margin:0;height:3px"><div class="pfill" style="width:${weekPct}%;background:${weekCol};height:3px"></div></div>`
-      }
+  // ── Onground helpers ────────────────────────────────────────────────────
+  const bad = (MR_DATA && MR_DATA.byAgentDate)      || {};  // assigned per day (AA)
+  const aad = (MR_DATA && MR_DATA.byAgentActionDate) || {};  // actions per day (AB)
+  const mrBA = (MR_DATA && MR_DATA.byAgent)          || {};
+  const mrCount = (agent, date) => (bad[agent] && bad[agent][date]) || 0;
+  const mrAct   = (agent, date) => (aad[agent] && aad[agent][date]) || 0;
+
+  // ── SF cases helpers ────────────────────────────────────────────────────
+  const finished  = R.filter(isFinished);
+  const sfToday   = (o) => R.filter(r=>isFinished(r)&&r.endISO===today&&r.owner===o).length;
+  const sfWeek    = (o) => R.filter(r=>isFinished(r)&&r.endISO>=wkRange.start&&r.endISO<=wkRange.end&&r.owner===o).length;
+  const sfYest    = (o) => R.filter(r=>isFinished(r)&&r.endISO===yest&&r.owner===o).length;
+
+  // ── Per-agent cards ─────────────────────────────────────────────────────
+  const grid = TEAM.map(o => {
+    const sfN    = sfToday(o);
+    const sfW    = sfWeek(o);
+    const dgt    = getAgentTarget(o, today);
+    const sfPct  = Math.min(Math.round(sfN/dgt*100),100);
+    const sfCol  = sfN>=dgt?'#16a34a':sfN>0?'var(--or)':'var(--re)';
+    const isProj = (AGENT_MODES[o]||{}).mode==='project';
+
+    const ogAss  = mrCount(o, today);
+    const ogAct  = mrAct(o, today);
+    const ogPct  = ogAss ? Math.min(Math.round(ogAct/ogAss*100),100) : 0;
+    const ogCol  = ogPct>=80?'#16a34a':ogPct>=50?'var(--or)':'var(--re)';
+
+    const yestSF = sfYest(o);
+    const sfDelta= sfN - yestSF;
+    const deltaCol= sfDelta>0?'#16a34a':sfDelta<0?'#dc2626':'var(--mu)';
+
+    return `<div class="card" style="border-top:3px solid ${COLORS[o]};${isMe(o)?'box-shadow:0 0 0 2px var(--or)':''}">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div class="av" style="background:${COLORS[o]};width:32px;height:32px;font-size:11px">${ini(o)}</div>
+          <div>
+            <div style="font-size:13px;font-weight:700">${o.split(' ')[0]}</div>
+            <div style="font-size:10px;color:var(--mu)">${o.split(' ')[1]||''}</div>
+          </div>
+        </div>
+        ${isMe(o)?'<span style="font-size:9px;background:var(--or);color:#fff;padding:2px 7px;border-radius:10px;font-weight:700">YOU</span>':''}
+        ${isProj?'<span style="font-size:9px;background:#7c3aed;color:#fff;padding:2px 7px;border-radius:10px">PROJECT</span>':''}
+      </div>
+
+      <!-- SF Cases today -->
+      <div style="background:var(--sur2);border-radius:var(--rs);padding:8px 10px;margin-bottom:8px">
+        <div style="font-size:10px;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">📊 SF Cases</div>
+        <div style="display:flex;align-items:baseline;gap:4px;margin-bottom:4px">
+          <span style="font-size:28px;font-weight:800;color:${sfCol};line-height:1">${sfN}</span>
+          <span style="font-size:11px;color:var(--mu)">/ ${dgt} today</span>
+          ${sfDelta!==0?`<span style="font-size:10px;color:${deltaCol};margin-left:4px">${sfDelta>0?'▲':'▼'}${Math.abs(sfDelta)} vs yest</span>`:''}
+        </div>
+        <div class="pbar" style="margin:0 0 5px"><div class="pfill" style="width:${sfPct}%;background:${sfCol}"></div></div>
+        <div style="font-size:10px;color:var(--mu)">Week: <strong style="color:${COLORS[o]}">${sfW}</strong> · All-time: <strong>${finished.filter(r=>r.owner===o).length.toLocaleString()}</strong></div>
+      </div>
+
+      <!-- Onground today -->
+      <div style="background:var(--sur2);border-radius:var(--rs);padding:8px 10px">
+        <div style="font-size:10px;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">📋 Onground</div>
+        <div style="display:flex;gap:10px;align-items:center">
+          <div style="text-align:center">
+            <div style="font-size:22px;font-weight:800;color:var(--or);line-height:1">${ogAss}</div>
+            <div style="font-size:9px;color:var(--mu)">assigned</div>
+          </div>
+          <div style="font-size:18px;color:var(--di)">→</div>
+          <div style="text-align:center">
+            <div style="font-size:22px;font-weight:800;color:${ogCol};line-height:1">${ogAct}</div>
+            <div style="font-size:9px;color:var(--mu)">actions</div>
+          </div>
+          ${ogAss>0?`<div style="margin-left:auto;font-size:13px;font-weight:800;color:${ogCol}">${ogPct}%</div>`:''}
+        </div>
+        ${ogAss>0?`<div class="pbar" style="margin:5px 0 0"><div class="pfill" style="width:${ogPct}%;background:${ogCol}"></div></div>`:''}
+      </div>
     </div>`;
   });
-  document.getElementById('agt-team-grid').innerHTML=grid.join('');
+  document.getElementById('agt-team-grid').innerHTML = grid.join('');
 
-  // All-time leaderboard (finished cases)
-  const finished=R.filter(isFinished);
-  const agtYesterday=_isoAdd(today,-1);
-  const lbAgt=TEAM.map(o=>{
-    const n=finished.filter(r=>r.owner===o).length;
-    const sku=R.filter(r=>r.owner===o).reduce((s,r)=>s+(r.skuAdded||0),0);
-    const yestN=R.filter(r=>isFinished(r)&&r.endISO===agtYesterday&&r.owner===o).length;
+  // ── Onground daily table (last 7 days) ──────────────────────────────────
+  const last7 = Array.from({length:7},(_,i)=>_isoAdd(today,-6+i));
+  const ogTable = `
+    <div class="card" style="margin-top:14px">
+      <div class="sh" style="margin-bottom:10px">
+        <div class="stit">📋 Onground — Daily Tracker</div>
+        <div style="font-size:10px;color:var(--mu)">Assigned (col AA) · Actions done (col AB) · Last 7 days</div>
+      </div>
+      <div style="overflow-x:auto">
+        <table style="min-width:520px;border-collapse:collapse">
+          <thead><tr>
+            <th style="text-align:left;padding:5px 8px;font-size:10px;color:var(--mu)">Agent</th>
+            ${last7.map(d=>{
+              const lbl=new Date(d+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',day:'numeric',month:'short'});
+              const isT=d===today;
+              return `<th colspan="2" style="text-align:center;padding:5px 8px;font-size:10px;color:${isT?'var(--or)':'var(--mu)'};${isT?'background:var(--or2);border-radius:4px':''}">${lbl}</th>`;
+            }).join('')}
+            <th colspan="2" style="text-align:center;padding:5px 8px;font-size:10px;color:var(--mu)">7-day Total</th>
+          </tr>
+          <tr>
+            <th></th>
+            ${last7.flatMap(()=>['<th style="text-align:center;font-size:9px;color:var(--or);padding:2px 4px">Asgn</th>','<th style="text-align:center;font-size:9px;color:#16a34a;padding:2px 4px">Done</th>']).join('')}
+            <th style="text-align:center;font-size:9px;color:var(--or);padding:2px 4px">Asgn</th>
+            <th style="text-align:center;font-size:9px;color:#16a34a;padding:2px 4px">Done</th>
+          </tr></thead>
+          <tbody>
+            ${TEAM.map(o=>{
+              const totAss = last7.reduce((s,d)=>s+mrCount(o,d),0);
+              const totAct = last7.reduce((s,d)=>s+mrAct(o,d),0);
+              return `<tr style="border-top:1px solid var(--bor)">
+                <td style="padding:5px 8px;white-space:nowrap">
+                  <div style="display:flex;align-items:center;gap:6px">
+                    <div style="width:8px;height:8px;border-radius:50%;background:${COLORS[o]}"></div>
+                    <span style="font-size:11px;font-weight:600">${o.split(' ')[0]}</span>
+                  </div>
+                </td>
+                ${last7.flatMap(d=>{
+                  const a=mrCount(o,d), act=mrAct(o,d);
+                  const isT=d===today;
+                  const aBg=isT?'var(--or2)':'transparent';
+                  const actCol=a&&act>=a?'#16a34a':act>0?'var(--or)':'var(--di)';
+                  return [
+                    `<td style="text-align:center;padding:4px;background:${aBg}">${a>0?`<span style="font-size:11px;font-weight:700;color:var(--or)">${a}</span>`:'<span style="color:var(--di);font-size:10px">—</span>'}</td>`,
+                    `<td style="text-align:center;padding:4px;background:${aBg}">${act>0?`<span style="font-size:11px;font-weight:700;color:${actCol}">${act}</span>`:'<span style="color:var(--di);font-size:10px">—</span>'}</td>`
+                  ];
+                }).join('')}
+                <td style="text-align:center;font-weight:800;color:var(--or)">${totAss}</td>
+                <td style="text-align:center;font-weight:800;color:#16a34a">${totAct}</td>
+              </tr>`;
+            }).join('')}
+            <tr style="border-top:2px solid var(--bor);background:var(--sur2)">
+              <td style="padding:5px 8px;font-size:10px;font-weight:700;color:var(--mu)">Team</td>
+              ${last7.flatMap(d=>{
+                const a=TEAM.reduce((s,o)=>s+mrCount(o,d),0);
+                const act=TEAM.reduce((s,o)=>s+mrAct(o,d),0);
+                const isT=d===today;
+                return [
+                  `<td style="text-align:center;padding:4px;${isT?'background:var(--or2)':''}">${a>0?`<span style="font-weight:700;color:var(--or)">${a}</span>`:'—'}</td>`,
+                  `<td style="text-align:center;padding:4px;${isT?'background:var(--or2)':''}">${act>0?`<span style="font-weight:700;color:#16a34a">${act}</span>`:'—'}</td>`
+                ];
+              }).join('')}
+              <td style="text-align:center;font-weight:800;color:var(--or)">${TEAM.reduce((s,o)=>s+last7.reduce((ss,d)=>ss+mrCount(o,d),0),0)}</td>
+              <td style="text-align:center;font-weight:800;color:#16a34a">${TEAM.reduce((s,o)=>s+last7.reduce((ss,d)=>ss+mrAct(o,d),0),0)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+
+  // ── Leaderboard ─────────────────────────────────────────────────────────
+  const lbAgt = TEAM.map(o=>{
+    const n = finished.filter(r=>r.owner===o).length;
+    const sku = R.filter(r=>r.owner===o).reduce((s,r)=>s+(r.skuAdded||0),0);
+    const yestN = sfYest(o);
     return {o,n,sku,yestN};
   }).sort((a,b)=>b.n-a.n);
-  const mx=lbAgt[0]?.n||1;
-  document.getElementById('agt-lb').innerHTML=lbAgt.map(e=>{
-    const deltaHtml=e.yestN>0?`<span style="font-size:10px;color:var(--gr);min-width:38px;text-align:right">▲${e.yestN} yest</span>`:'<span style="font-size:10px;color:var(--mu);min-width:38px;text-align:right">—</span>';
-    return `<div class="lrow" style="${e.o===USER.agentName?'background:var(--or2);border-radius:var(--rs);padding:10px':''}">
+  const mx = lbAgt[0]?.n||1;
+  document.getElementById('agt-lb').innerHTML = lbAgt.map(e=>{
+    const deltaHtml = e.yestN>0 ? `<span style="font-size:10px;color:var(--gr);min-width:38px;text-align:right">▲${e.yestN} yest</span>` : '<span style="font-size:10px;color:var(--mu);min-width:38px;text-align:right">—</span>';
+    return `<div class="lrow" style="${isMe(e.o)?'background:var(--or2);border-radius:var(--rs);padding:10px':''}">
       <div class="av" style="background:${COLORS[e.o]};width:30px;height:30px">${ini(e.o)}</div>
-      <div class="lname">${e.o}${e.o===USER.agentName?' <span style="font-size:9px;background:var(--or);color:#fff;padding:1px 5px;border-radius:3px">YOU</span>':''}</div>
+      <div class="lname">${e.o}${isMe(e.o)?' <span style="font-size:9px;background:var(--or);color:#fff;padding:1px 5px;border-radius:3px">YOU</span>':''}</div>
       <div><div class="lbar"><div class="lbf" style="width:${Math.round(e.n/mx*100)}%"></div></div></div>
       <div class="lcount">${e.n.toLocaleString()}</div>
       ${deltaHtml}
@@ -2162,14 +2280,29 @@ function renderAgentOverview(){
     </div>`;
   }).join('');
 
-  const pend=R.filter(r=>r.status==='Pending').length;
-  const pfb=R.filter(r=>r.status==='Pending Feedback').length;
-  const rej=R.filter(r=>r.status==='Rejected').length;
-  document.getElementById('agt-qs').innerHTML=`
-    <div class="qrow"><div class="qlbl"><span class="dot" style="background:var(--gr)"></span>Finished (has End Date)</div><div style="font-weight:700">${finished.length.toLocaleString()}</div></div>
-    <div class="qrow"><div class="qlbl"><span class="dot" style="background:var(--ye)"></span>Pending</div><div style="font-weight:700">${pend.toLocaleString()}</div></div>
-    <div class="qrow"><div class="qlbl"><span class="dot" style="background:var(--bl)"></span>Pending Feedback</div><div style="font-weight:700">${pfb.toLocaleString()}</div></div>
-    <div class="qrow"><div class="qlbl"><span class="dot" style="background:var(--re)"></span>Rejected</div><div style="font-weight:700">${rej.toLocaleString()}</div></div>`;
+  // ── Queue status ─────────────────────────────────────────────────────────
+  const pend = R.filter(r=>r.status==='Pending').length;
+  const pfb  = R.filter(r=>r.status==='Pending Feedback').length;
+  const rej  = R.filter(r=>r.status==='Rejected').length;
+  const mrTotals = MR_DATA.totals || {};
+  document.getElementById('agt-qs').innerHTML = `
+    <div class="qrow"><div class="qlbl"><span class="dot" style="background:var(--gr)"></span>SF Finished</div><div style="font-weight:700">${finished.length.toLocaleString()}</div></div>
+    <div class="qrow"><div class="qlbl"><span class="dot" style="background:var(--ye)"></span>SF Pending</div><div style="font-weight:700">${pend.toLocaleString()}</div></div>
+    <div class="qrow"><div class="qlbl"><span class="dot" style="background:var(--bl)"></span>SF Pending Feedback</div><div style="font-weight:700">${pfb.toLocaleString()}</div></div>
+    <div class="qrow"><div class="qlbl"><span class="dot" style="background:var(--re)"></span>SF Rejected</div><div style="font-weight:700">${rej.toLocaleString()}</div></div>
+    <div style="border-top:1px solid var(--bor);margin:10px 0 8px"></div>
+    <div class="qrow"><div class="qlbl"><span class="dot" style="background:var(--or)"></span>Onground Assigned (all-time)</div><div style="font-weight:700">${mrTotals.total||0}</div></div>
+    <div class="qrow"><div class="qlbl"><span class="dot" style="background:#16a34a"></span>Onground Done</div><div style="font-weight:700">${mrTotals.done||0}</div></div>
+    <div class="qrow"><div class="qlbl"><span class="dot" style="background:var(--di)"></span>Onground Cancelled</div><div style="font-weight:700">${mrTotals.cancelled||0}</div></div>
+    <div class="qrow"><div class="qlbl"><span class="dot" style="background:#7c3aed"></span>Onground Pend. Regional</div><div style="font-weight:700">${mrTotals.pendingRegional||0}</div></div>`;
+
+  // inject ogTable after the grid
+  const existingOgTable = document.getElementById('agt-og-table');
+  if(existingOgTable) existingOgTable.outerHTML = ogTable.replace('<div class="card"','<div class="card" id="agt-og-table"');
+  else {
+    const grid_el = document.getElementById('agt-team-grid');
+    grid_el.insertAdjacentHTML('afterend', ogTable.replace('<div class="card"','<div class="card" id="agt-og-table"'));
+  }
 }
 
 // ═══ AGENT: MY CASES PROFILE ═══════════════════════════════════════════════
