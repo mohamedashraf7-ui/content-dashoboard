@@ -1121,7 +1121,8 @@ function loadData(){
         if(USER&&USER.role==='manager'){ renderOverview(); }
         else { renderAgentOverview(); }
         const ap=document.querySelector('.page.on')?.id;
-        if(ap==='pg-agt-overview') renderAgentOverview();
+        // Manager on Team Today: renderOverview() above doesn't show agt-ov-body, so call explicitly
+        if(USER&&USER.role==='manager'&&ap==='pg-agt-overview') renderAgentOverview();
         if(ap==='pg-daily')        renderDaily();
         if(ap==='pg-monthly')      renderMonthly();
         if(ap==='pg-deepdive')     renderDD();
