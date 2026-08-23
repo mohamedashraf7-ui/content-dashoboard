@@ -1121,6 +1121,7 @@ function loadData(){
         if(USER&&USER.role==='manager'){ renderOverview(); }
         else { renderAgentOverview(); }
         const ap=document.querySelector('.page.on')?.id;
+        if(ap==='pg-agt-overview') renderAgentOverview();
         if(ap==='pg-daily')        renderDaily();
         if(ap==='pg-monthly')      renderMonthly();
         if(ap==='pg-deepdive')     renderDD();
@@ -1158,7 +1159,8 @@ function loadMainRequestData() {
       if (d && !d.error) {
         MR_DATA = d;
         const pg = document.querySelector('.page.on');
-        if (pg && pg.id === 'pg-overview') renderMRSection();
+        if (pg && pg.id === 'pg-overview')     renderMRSection();
+        if (pg && pg.id === 'pg-agt-overview') renderAgentOverview();
       }
     })
     .withFailureHandler(function(){})
