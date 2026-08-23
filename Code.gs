@@ -847,6 +847,34 @@ function _buildProgressMessage() {
     }
   } catch(mrErr) {}
 
+  // ── Special Projects — chains ending today ─────────────────────────────────
+  try {
+    var agentModes   = getAgentModes();
+    var projConfigs  = getProjectConfigs();
+
+    // Build lookup: projectName → chainName
+    var chainByProject = {};
+    projConfigs.forEach(function(pc) {
+      if (pc.chainName) chainByProject[pc.projectName] = pc.chainName;
+    });
+
+    // Collect chains ending today (deduplicate by chain name)
+    var chainsEndingToday = {};
+    agentModes.forEach(function(am) {
+      if (am.mode === 'project' && am.projectEndDate === today) {
+        var chain = chainByProject[am.projectName] || am.projectName;
+        chainsEndingToday[chain] = (chainsEndingToday[chain] || 0) + 1;
+      }
+    });
+
+    var endingChains = Object.keys(chainsEndingToday);
+    if (endingChains.length > 0) {
+      var chainLines = endingChains.map(function(c) { return '• ' + c; });
+      msg += '\n\n🏁 *Projects Ending Today (' + endingChains.length + ' chain' + (endingChains.length > 1 ? 's' : '') + ')*\n'
+           + chainLines.join('\n');
+    }
+  } catch(projErr) {}
+
   return msg;
 }
 
