@@ -1058,6 +1058,21 @@ if (id==='org')          renderOrgView();
   if (id==='caselookup')   { document.getElementById('cl-input').focus(); if(R.length) renderPendingTracker(); }
 }
 
+// ═══ GLOBAL DATE HELPERS ═══════════════════════════════════════════════════
+function _fmtD(d) { return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function isoWeekOf(weeksAgo) {
+  const ref = new Date(todayISO()+'T12:00:00');
+  const sun = new Date(ref); sun.setDate(ref.getDate() - ref.getDay() - weeksAgo*7);
+  const sat = new Date(sun); sat.setDate(sun.getDate()+6);
+  return { start: _fmtD(sun), end: _fmtD(sat) };
+}
+function isoMonthOf(mAgo) {
+  const ref = new Date(todayISO()+'T12:00:00');
+  const f = new Date(ref.getFullYear(), ref.getMonth()-mAgo, 1);
+  const l = new Date(ref.getFullYear(), ref.getMonth()-mAgo+1, 0);
+  return { start: _fmtD(f), end: _fmtD(l), ym: _fmtD(f).slice(0,7) };
+}
+
 // ═══ THEME / LANG ══════════════════════════════════════════════════════════
 function toggleTheme(){const l=document.documentElement.dataset.theme==='light';document.documentElement.dataset.theme=l?'':'light';document.getElementById('tbtn').textContent=l?'☀ Light':'☾ Dark';localStorage.setItem('tlb-theme',l?'dark':'light');}
 (()=>{if(localStorage.getItem('tlb-theme')==='light'){document.documentElement.dataset.theme='light';document.getElementById('tbtn').textContent='☾ Dark';}})();
