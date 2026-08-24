@@ -236,6 +236,7 @@ tr:hover td{background:var(--sur2)}
       <div class="ni" data-navid="quality" onclick="gp('quality',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>Quality Score</div>
       <div class="ni" data-navid="kpi" onclick="gp('kpi',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>KPI Dashboard</div>
       <div class="ni" data-navid="projects" onclick="gp('projects',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h7v7H3z"/><path d="M14 3h7v7h-7z"/><path d="M14 14h7v7h-7z"/><path d="M3 14h7v7H3z"/><line x1="10" y1="7" x2="14" y2="7"/><line x1="17" y1="10" x2="17" y2="14"/><line x1="10" y1="17" x2="14" y2="17"/><line x1="7" y1="10" x2="7" y2="14"/></svg>Projects</div>
+<div class="ni" data-navid="onground" onclick="gp('onground',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 16l4-4 4 4 4-6"/></svg>Onground Trends</div>
 <div class="ns">Team</div>
       <div class="ni" data-navid="deepdive" onclick="gp('deepdive',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>Deep Dive</div>
       <div class="ni" data-navid="caselookup" onclick="gp('caselookup',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Case Lookup</div>
@@ -246,8 +247,10 @@ tr:hover td{background:var(--sur2)}
     <!-- AGENT NAV -->
     <div id="agt-nav" style="display:none">
       <div class="ns">My Dashboard</div>
-      <div class="ni" onclick="gp('org',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="2" width="6" height="5" rx="1"/><rect x="1" y="15" width="6" height="5" rx="1"/><rect x="9" y="15" width="6" height="5" rx="1"/><rect x="17" y="15" width="6" height="5" rx="1"/><line x1="12" y1="7" x2="12" y2="11"/><line x1="4" y1="15" x2="4" y2="11"/><line x1="12" y1="11" x2="4" y2="11"/><line x1="20" y1="15" x2="20" y2="11"/><line x1="12" y1="11" x2="20" y2="11"/><line x1="12" y1="11" x2="12" y2="15"/></svg>Team Org</div>
-      <div class="ni" onclick="gp('agt-overview',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>Team Today</div>
+      <div class="ni" onclick="gp('org',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="2" width="6" height="5" rx="1"/><rect x="1" y="15" width="6" height="5" rx="1"/><rect x="9" y="15" width="6" height="5" rx="1"/><rect x="17" y="15" width="6" height="5" rx="1"/><line x1="12" y1="7" x2="12" y2="11"/><line x1="4" y1="15" x2="4" y2="11"/><line x1="12" y1="11" x2="4" y2="11"/><line x1="20" y1="15" x2="20" y2="11"/><line x1="12" y1="11" x2="20" y2="11"/><line x1="12" y1="11" x2="12" y2="15"/></svg>Org View</div>
+      <div class="ni" onclick="gp('overview',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>Overview</div>
+      <div class="ni" onclick="gp('agt-overview',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>Team Today</div>
+      <div class="ni" onclick="gp('onground',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 16l4-4 4 4 4-6"/></svg>Onground Trends</div>
       <div class="ni" onclick="gp('agt-profile',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>My Cases</div>
       <div class="ni" onclick="gp('agt-notes',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>My Tasks</div>
     </div>
@@ -867,6 +870,13 @@ tr:hover td{background:var(--sur2)}
       <div id="agt-notes-body"><div class="loading"><div class="spin"></div></div></div>
     </div>
 
+    <!-- ══ ONGROUND TRENDS ═══════════════════════════════════════════════════ -->
+    <div class="page" id="pg-onground">
+      <div style="font-size:19px;font-weight:700;margin-bottom:3px">Onground Trends</div>
+      <div style="font-size:13px;color:var(--mu);margin-bottom:16px">Day-over-Day · Week-over-Week · Month-over-Month · Top performer spotlight</div>
+      <div id="og-trends-body"><div class="loading"><div class="spin"></div><div class="ltxt">Loading…</div></div></div>
+    </div>
+
   </div><!-- /content -->
 </main>
 </div><!-- /app -->
@@ -1044,6 +1054,7 @@ function gp(id, el) {
   if (id==='settings')     switchSettingsTab('targets');
   if (id==='projects')     loadAndRenderProjects();
 if (id==='org')          renderOrgView();
+  if (id==='onground')     renderOngroundTrends();
   if (id==='caselookup')   { document.getElementById('cl-input').focus(); if(R.length) renderPendingTracker(); }
 }
 
@@ -1162,6 +1173,7 @@ function loadMainRequestData() {
         const pg = document.querySelector('.page.on');
         if (pg && pg.id === 'pg-overview')     renderMRSection();
         if (pg && pg.id === 'pg-agt-overview') renderAgentOverview();
+        if (pg && pg.id === 'pg-onground')     renderOngroundTrends();
       }
     })
     .withFailureHandler(function(){})
@@ -1402,6 +1414,204 @@ function renderMRSection() {
   }
 
   el.innerHTML = html;
+}
+
+function renderOngroundTrends() {
+  const el = document.getElementById('og-trends-body');
+  if (!el) return;
+  if (!MR_DATA || !MR_DATA.byAgentReceivedDate) {
+    el.innerHTML = '<div style="color:var(--mu);padding:20px 0">No onground data loaded yet.</div>';
+    return;
+  }
+
+  const AGENTS    = ['Mohamed Gadallah','Seliem Mohamed','Omar Elattar','Mahmoud Amin'];
+  const AGT_COLOR = {'Mohamed Gadallah':'#FF6B35','Seliem Mohamed':'#3b82f6','Omar Elattar':'#22c55e','Mahmoud Amin':'#f59e0b'};
+  const AGT_SHORT = {'Mohamed Gadallah':'Gadallah','Seliem Mohamed':'Seliem','Omar Elattar':'Omar','Mahmoud Amin':'Mahmoud'};
+
+  const brd = MR_DATA.byAgentReceivedDate || {};  // received per agent per day
+  const bad = MR_DATA.byAgentDate         || {};  // assigned per agent per day
+  const aad = MR_DATA.byAgentActionDate   || {};  // done per agent per day
+
+  // helper: sum a map[agent][date] over a date range
+  const sumRange = (map, agent, dates) => dates.reduce((s, d) => s + ((map[agent] && map[agent][d]) || 0), 0);
+
+  // build list of last 90 days
+  const today = todayISO();
+  const days = [];
+  for (let i = 89; i >= 0; i--) {
+    const d = new Date(today + 'T12:00:00');
+    d.setDate(d.getDate() - i);
+    days.push(d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'));
+  }
+
+  // date windows
+  const todayArr      = [today];
+  const yesterdayArr  = [days[days.length - 2]];
+  const thisWeek      = days.slice(-7);
+  const lastWeek      = days.slice(-14, -7);
+  const thisMonth     = days.filter(d => d.slice(0,7) === today.slice(0,7));
+  const lastMonthStr  = (() => { const d = new Date(today.slice(0,7) + '-01'); d.setMonth(d.getMonth()-1); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); })();
+  const lastMonth     = days.filter(d => d.slice(0,7) === lastMonthStr);
+
+  // compute team totals per window per metric
+  const teamTotal = (map, dateArr) => AGENTS.reduce((s, a) => s + sumRange(map, a, dateArr), 0);
+
+  const metrics = [
+    { key:'rcv',  label:'Received',  map: brd, color:'#3b82f6' },
+    { key:'asgn', label:'Assigned',  map: bad, color:'#f59e0b' },
+    { key:'done', label:'Done',      map: aad, color:'#22c55e' },
+  ];
+
+  // DoD / WoW / MoM cards
+  const pct = (cur, prev) => prev === 0 ? (cur > 0 ? '+100%' : '—') : (cur >= prev ? '+' : '') + Math.round((cur-prev)/prev*100) + '%';
+  const arrow = (cur, prev) => cur > prev ? '▲' : cur < prev ? '▼' : '→';
+  const arrowColor = (cur, prev) => cur > prev ? '#22c55e' : cur < prev ? '#ef4444' : 'var(--mu)';
+
+  let cards = '';
+  metrics.forEach(m => {
+    const dod_cur  = teamTotal(m.map, todayArr);
+    const dod_prev = teamTotal(m.map, yesterdayArr);
+    const wow_cur  = teamTotal(m.map, thisWeek);
+    const wow_prev = teamTotal(m.map, lastWeek);
+    const mom_cur  = teamTotal(m.map, thisMonth);
+    const mom_prev = teamTotal(m.map, lastMonth);
+    cards += `
+    <div class="card" style="padding:14px 16px">
+      <div style="font-size:11px;font-weight:700;color:${m.color};margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px">${m.label}</div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap">
+        ${[['DoD',dod_cur,dod_prev,todayArr],['WoW',wow_cur,wow_prev,thisWeek],['MoM',mom_cur,mom_prev,thisMonth]].map(([lbl,cur,prev])=>`
+        <div style="flex:1;min-width:70px;background:var(--sur2);border-radius:8px;padding:8px 10px;text-align:center">
+          <div style="font-size:10px;color:var(--mu);font-weight:600;margin-bottom:4px">${lbl}</div>
+          <div style="font-size:20px;font-weight:800;color:var(--tx)">${cur}</div>
+          <div style="font-size:11px;font-weight:700;color:${arrowColor(cur,prev)}">${arrow(cur,prev)} ${pct(cur,prev)}</div>
+          <div style="font-size:10px;color:var(--mu)">prev: ${prev}</div>
+        </div>`).join('')}
+      </div>
+    </div>`;
+  });
+
+  // Top performer per metric (this week)
+  const topAgent = (map, dateArr) => {
+    let best = null, bestVal = -1;
+    AGENTS.forEach(a => { const v = sumRange(map, a, dateArr); if (v > bestVal) { bestVal = v; best = a; } });
+    return { agent: best, val: bestVal };
+  };
+
+  let spotlightRows = '';
+  metrics.forEach(m => {
+    const tw = topAgent(m.map, thisWeek);
+    const tm = topAgent(m.map, thisMonth);
+    spotlightRows += `<tr>
+      <td style="padding:8px 10px;font-size:12px;font-weight:600;color:${m.color}">${m.label}</td>
+      <td style="padding:8px 10px;font-size:12px">🏅 <strong>${AGT_SHORT[tw.agent]||tw.agent}</strong> <span style="color:var(--mu)">(${tw.val})</span></td>
+      <td style="padding:8px 10px;font-size:12px">🏅 <strong>${AGT_SHORT[tm.agent]||tm.agent}</strong> <span style="color:var(--mu)">(${tm.val})</span></td>
+    </tr>`;
+  });
+
+  // Per-agent summary table (this week vs last week)
+  let agentRows = '';
+  AGENTS.forEach(a => {
+    const rcv_w  = sumRange(brd, a, thisWeek);
+    const asgn_w = sumRange(bad, a, thisWeek);
+    const done_w = sumRange(aad, a, thisWeek);
+    const rcv_m  = sumRange(brd, a, thisMonth);
+    const asgn_m = sumRange(bad, a, thisMonth);
+    const done_m = sumRange(aad, a, thisMonth);
+    const doneRate = rcv_m > 0 ? Math.round(done_m / rcv_m * 100) : 0;
+    agentRows += `<tr>
+      <td style="padding:7px 10px;font-size:12px;font-weight:700">
+        <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${AGT_COLOR[a]};margin-right:6px"></span>${AGT_SHORT[a]}
+      </td>
+      <td style="padding:7px 8px;text-align:center;font-size:12px;color:#3b82f6">${rcv_w}</td>
+      <td style="padding:7px 8px;text-align:center;font-size:12px;color:#f59e0b">${asgn_w}</td>
+      <td style="padding:7px 8px;text-align:center;font-size:12px;color:#22c55e">${done_w}</td>
+      <td style="padding:7px 8px;text-align:center;font-size:12px;color:#3b82f6">${rcv_m}</td>
+      <td style="padding:7px 8px;text-align:center;font-size:12px;color:#f59e0b">${asgn_m}</td>
+      <td style="padding:7px 8px;text-align:center;font-size:12px;color:#22c55e">${done_m}</td>
+      <td style="padding:7px 8px;text-align:center;font-size:12px;font-weight:700;color:${doneRate>=80?'#22c55e':doneRate>=50?'#f59e0b':'#ef4444'}">${doneRate}%</td>
+    </tr>`;
+  });
+
+  // 14-day daily trend bar chart (sparkline style)
+  const last14 = days.slice(-14);
+  const maxTeamDay = Math.max(1, ...last14.map(d => AGENTS.reduce((s,a) => s + ((brd[a]&&brd[a][d])||0), 0)));
+  let sparkRows = '';
+  last14.forEach(d => {
+    const rcvT  = AGENTS.reduce((s,a) => s + ((brd[a]&&brd[a][d])||0), 0);
+    const asgnT = AGENTS.reduce((s,a) => s + ((bad[a]&&bad[a][d])||0), 0);
+    const doneT = AGENTS.reduce((s,a) => s + ((aad[a]&&aad[a][d])||0), 0);
+    const barW  = Math.round(rcvT / maxTeamDay * 100);
+    const lbl   = d.slice(5); // MM-DD
+    sparkRows += `<tr>
+      <td style="padding:4px 8px;font-size:10px;color:var(--mu);white-space:nowrap">${lbl}</td>
+      <td style="padding:4px 8px;font-size:11px;text-align:center;color:#3b82f6;font-weight:600">${rcvT}</td>
+      <td style="padding:4px 8px;font-size:11px;text-align:center;color:#f59e0b;font-weight:600">${asgnT}</td>
+      <td style="padding:4px 8px;font-size:11px;text-align:center;color:#22c55e;font-weight:600">${doneT}</td>
+      <td style="padding:4px 8px;min-width:80px">
+        <div style="height:10px;background:#3b82f620;border-radius:4px;overflow:hidden">
+          <div style="height:100%;width:${barW}%;background:#3b82f6;border-radius:4px"></div>
+        </div>
+      </td>
+    </tr>`;
+  });
+
+  el.innerHTML = `
+  <div class="g3" style="margin-bottom:16px">${cards}</div>
+
+  <div class="g2" style="margin-bottom:16px">
+    <div class="card">
+      <div class="sh"><div class="stit">🏆 Top Performer Spotlight</div></div>
+      <table style="width:100%;border-collapse:collapse">
+        <thead><tr style="background:var(--sur2)">
+          <th style="padding:7px 10px;font-size:10px;font-weight:700;color:var(--mu);text-align:left">Metric</th>
+          <th style="padding:7px 10px;font-size:10px;font-weight:700;color:var(--mu);text-align:left">This Week</th>
+          <th style="padding:7px 10px;font-size:10px;font-weight:700;color:var(--mu);text-align:left">This Month</th>
+        </tr></thead>
+        <tbody>${spotlightRows}</tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <div class="sh"><div class="stit">📅 14-Day Daily Trend</div></div>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse">
+          <thead><tr style="background:var(--sur2)">
+            <th style="padding:4px 8px;font-size:10px;font-weight:700;color:var(--mu)">Date</th>
+            <th style="padding:4px 8px;font-size:10px;font-weight:700;color:#3b82f6">Rcv</th>
+            <th style="padding:4px 8px;font-size:10px;font-weight:700;color:#f59e0b">Asgn</th>
+            <th style="padding:4px 8px;font-size:10px;font-weight:700;color:#22c55e">Done</th>
+            <th style="padding:4px 8px;font-size:10px;font-weight:700;color:var(--mu)">Volume</th>
+          </tr></thead>
+          <tbody>${sparkRows}</tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="sh"><div class="stit">👥 Per-Agent Summary</div></div>
+    <div style="overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse">
+        <thead>
+          <tr style="background:var(--sur2)">
+            <th style="padding:7px 10px;font-size:10px;font-weight:700;color:var(--mu);text-align:left" rowspan="2">Agent</th>
+            <th colspan="3" style="padding:4px 8px;font-size:10px;font-weight:700;color:var(--mu);text-align:center;border-bottom:1px solid var(--bor)">This Week</th>
+            <th colspan="3" style="padding:4px 8px;font-size:10px;font-weight:700;color:var(--mu);text-align:center;border-bottom:1px solid var(--bor)">This Month</th>
+            <th style="padding:7px 8px;font-size:10px;font-weight:700;color:var(--gr);text-align:center" rowspan="2">Done%</th>
+          </tr>
+          <tr style="background:var(--sur2)">
+            <th style="padding:4px 8px;font-size:10px;font-weight:700;color:#3b82f6;text-align:center">Rcv</th>
+            <th style="padding:4px 8px;font-size:10px;font-weight:700;color:#f59e0b;text-align:center">Asgn</th>
+            <th style="padding:4px 8px;font-size:10px;font-weight:700;color:#22c55e;text-align:center">Done</th>
+            <th style="padding:4px 8px;font-size:10px;font-weight:700;color:#3b82f6;text-align:center">Rcv</th>
+            <th style="padding:4px 8px;font-size:10px;font-weight:700;color:#f59e0b;text-align:center">Asgn</th>
+            <th style="padding:4px 8px;font-size:10px;font-weight:700;color:#22c55e;text-align:center">Done</th>
+          </tr>
+        </thead>
+        <tbody>${agentRows}</tbody>
+      </table>
+    </div>
+  </div>`;
 }
 
 function renderMRAgentSection(agentName) {
