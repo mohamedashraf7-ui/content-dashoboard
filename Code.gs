@@ -767,6 +767,7 @@ function _buildProgressMessage() {
   var statusIdx = hdr.indexOf('status');
   var endIdx    = hdr.indexOf('categorization date') >= 0 ? hdr.indexOf('categorization date') : hdr.indexOf('end date');
   var startIdx  = hdr.indexOf('start date');
+  var typeIdx   = hdr.indexOf('type');
 
   if (ownerIdx < 0) {
     // fallback: use known column positions Z=25, AA=26, AB=27, AD=29
@@ -776,6 +777,16 @@ function _buildProgressMessage() {
   var TEAM_NAMES = ['Mohamed Gadallah','Seliem Mohamed','Omar Elattar','Mahmoud Amin'];
   var DEFAULT_TARGET = 15;
 
+  // Weight a row: MPC Creation any status=0.5; Done/Pending Regional=1; else 0
+  function _caseWeight(status, caseType, hasEndDate) {
+    if (!hasEndDate) return 0;
+    var isMPC = String(caseType||'').toLowerCase().indexOf('mpc creation') >= 0;
+    var st = String(status||'').trim();
+    if (isMPC) return (st==='Done'||st==='Rejected'||st.toLowerCase().indexOf('pending')>=0) ? 0.5 : 0;
+    if (st==='Done'||st==='Pending Regional') return 1;
+    return 0;
+  }
+
   // Load targets from Properties
   var tgtRaw = PropertiesService.getScriptProperties().getProperty('AGENT_TARGETS');
   var tgtMap = {};
@@ -783,29 +794,33 @@ function _buildProgressMessage() {
   var thisM = today.slice(0,7);
 
   var stats = {};
-  TEAM_NAMES.forEach(function(n){ stats[n] = { done:0, pending:0, pfb:0, rej:0 }; });
+  TEAM_NAMES.forEach(function(n){ stats[n] = { done:0, pending:0, pfb:0, pam:0, rej:0 }; });
 
   for (var i = 1; i < data.length; i++) {
-    var row    = data[i];
-    var owner  = String(row[ownerIdx]||'').trim();
-    var status = String(row[statusIdx]||'').trim();
-    var endRaw = row[endIdx];
-    var endISO = endRaw ? Utilities.formatDate(new Date(endRaw), Session.getScriptTimeZone(), 'yyyy-MM-dd') : '';
+    var row      = data[i];
+    var owner    = String(row[ownerIdx]||'').trim();
+    var status   = String(row[statusIdx]||'').trim();
+    var caseType = typeIdx >= 0 ? String(row[typeIdx]||'').trim() : '';
+    var endRaw   = row[endIdx];
+    var endISO   = endRaw ? Utilities.formatDate(new Date(endRaw), Session.getScriptTimeZone(), 'yyyy-MM-dd') : '';
     if (!stats[owner]) continue;
-    if (endISO === today)          stats[owner].done++;
-    if (status === 'Pending')      stats[owner].pending++;
-    if (status === 'Pending Feedback') stats[owner].pfb++;
-    if (status === 'Rejected')     stats[owner].rej++;
+    if (endISO === today) stats[owner].done += _caseWeight(status, caseType, true);
+    if (status === 'Pending')              stats[owner].pending++;
+    if (status === 'Pending Feedback')     stats[owner].pfb++;
+    if (status === 'Pending AM Feedback')  stats[owner].pam++;
+    if (status === 'Rejected')             stats[owner].rej++;
   }
 
   var teamDone = 0, teamTgt = 0, lines = [];
   TEAM_NAMES.forEach(function(n){
     var tgt = (tgtMap[n] && tgtMap[n][thisM]) || DEFAULT_TARGET;
     var s   = stats[n];
-    var pct = Math.round(s.done / tgt * 100);
+    var d   = Math.round(s.done * 10) / 10;
+    var pct = Math.round(d / tgt * 100);
     var bar = pct >= 120 ? '🚀' : pct >= 80 ? '✅' : pct >= 50 ? '⚠️' : '🔴';
-    lines.push(bar + ' *' + n.split(' ')[0] + '*: ' + s.done + '/' + tgt + ' (' + pct + '%)');
-    teamDone += s.done;
+    var pamNote = s.pam > 0 ? ' 🟠 ' + s.pam + ' AM' : '';
+    lines.push(bar + ' *' + n.split(' ')[0] + '*: ' + d + '/' + tgt + ' (' + pct + '%)' + pamNote);
+    teamDone += d;
     teamTgt  += tgt;
   });
 
@@ -815,6 +830,7 @@ function _buildProgressMessage() {
   var top = TEAM_NAMES.slice().sort(function(a,b){ return stats[b].done - stats[a].done; })[0];
   var totalPend = TEAM_NAMES.reduce(function(s,n){ return s + stats[n].pending + stats[n].pfb; }, 0);
   var totalRej  = TEAM_NAMES.reduce(function(s,n){ return s + stats[n].rej; }, 0);
+  var totalPam  = TEAM_NAMES.reduce(function(s,n){ return s + stats[n].pam; }, 0);
 
   var now   = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'HH:mm');
   var dayLbl= Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'EEE dd MMM');
@@ -825,8 +841,9 @@ function _buildProgressMessage() {
     + lines.join('\n') + '\n'
     + '─────────────────\n'
     + teamIcon + ' *Team Total: ' + teamDone + '/' + teamTgt + ' (' + teamPct + '%)*\n'
-    + '🏆 Top today: ' + top.split(' ')[0] + ' (' + stats[top].done + ' cases)\n'
-    + '⏳ Pending: ' + totalPend + '  🔴 Rejected: ' + totalRej;
+    + '🏆 Top today: ' + top.split(' ')[0] + ' (' + (Math.round(stats[top].done*10)/10) + ' score)\n'
+    + '⏳ Pending: ' + totalPend + '  🔴 Rejected: ' + totalRej
+    + (totalPam > 0 ? '  🟠 Pend.AM: ' + totalPam : '');
 
   // ── Onground Requests section ──────────────────────────────────────────────
   try {

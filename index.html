@@ -315,12 +315,13 @@ tr:hover td{background:var(--sur2)}
           <div class="pbar"><div class="pfill" id="pfill" style="width:0%"></div></div>
           <div style="font-size:12px;color:var(--mu)" id="pdet">—</div>
         </div>
-        <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:14px;margin-bottom:14px">
+        <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:14px;margin-bottom:14px">
           <div class="card"><div class="cl">Total in Sheet</div><div class="cv" style="color:var(--or)" id="s-tot">—</div><div class="cs">all rows</div></div>
-          <div class="card"><div class="cl">Finished (End Date)</div><div class="cv" style="color:var(--gr)" id="s-done">—</div><div class="cs"><span class="dot" style="background:var(--gr)"></span><span id="s-pct">—</span> rate</div></div>
+          <div class="card"><div class="cl">Score (Weighted)</div><div class="cv" style="color:var(--gr)" id="s-done">—</div><div class="cs"><span class="dot" style="background:var(--gr)"></span><span id="s-pct">—</span> rate</div></div>
           <div class="card"><div class="cl">SKU Added</div><div class="cv" style="color:var(--bl)" id="s-sku">—</div><div class="cs"><span class="dot" style="background:var(--bl)"></span>col V total</div></div>
           <div class="card"><div class="cl">Pending</div><div class="cv" style="color:var(--ye)" id="s-pend">—</div><div class="cs"><span class="dot" style="background:var(--ye)"></span>awaiting action</div></div>
           <div class="card"><div class="cl">Pending Feedback</div><div class="cv" style="color:var(--bl)" id="s-pfb">—</div><div class="cs"><span class="dot" style="background:var(--bl)"></span>awaiting feedback</div></div>
+          <div class="card" style="border:2px solid #f97316;background:#fff7ed"><div class="cl" style="color:#f97316">Pend. AM Feedback</div><div class="cv" style="color:#f97316" id="s-pam">—</div><div class="cs"><span class="dot" style="background:#f97316"></span>needs AM action</div></div>
           <div class="card"><div class="cl">Rejected</div><div class="cv" style="color:var(--re)" id="s-rej">—</div><div class="cs"><span class="dot" style="background:var(--re)"></span>need follow-up</div></div>
         </div>
         <div class="g2" style="margin-bottom:14px">
@@ -1110,12 +1111,27 @@ function normStat(s){
   s=String(s||'').trim();
   if(s==='Done') return 'Done';
   if(s==='Rejected') return 'Rejected';
+  if(s.toLowerCase().includes('am feedback')) return 'Pending AM Feedback';
   if(s.toLowerCase().includes('feedback')||s.toLowerCase().includes('fdbk')) return 'Pending Feedback';
+  if(s.toLowerCase().includes('regional')) return 'Pending Regional';
   if(s.toLowerCase().startsWith('pending')) return 'Pending';
   return '';
 }
-// Q3: finished = has an End Date (regardless of status)
+// Finished = has an End Date
 function isFinished(r){ return !!r.endISO; }
+// Weight per case: MPC Creation = 0.5 for any status; others: Done/Pending Regional = 1, else 0
+function caseWeight(r){
+  if(!r.endISO) return 0;
+  const isMPC=(r.caseType||'').toLowerCase().includes('mpc creation');
+  const st=r.status||'';
+  if(isMPC) return (st==='Done'||st==='Rejected'||st.startsWith('Pending'))?0.5:0;
+  if(st==='Done'||st==='Pending Regional') return 1;
+  return 0;
+}
+// Sum weighted scores for an array of rows
+function sumW(arr){ return arr.reduce((s,r)=>s+caseWeight(r),0); }
+// Format score: show integer if whole, else 1 decimal
+function fmtW(v){ return Number.isInteger(v)?v:v.toFixed(1); }
 
 // ═══ LOAD DATA ═════════════════════════════════════════════════════════════
 function loadData(){
@@ -1682,38 +1698,41 @@ function renderOverview(){
   const finished=R.filter(isFinished);
   const pend=R.filter(r=>r.status==='Pending').length;
   const pfb=R.filter(r=>r.status==='Pending Feedback').length;
+  const pam=R.filter(r=>r.status==='Pending AM Feedback').length;
   const rej=R.filter(r=>r.status==='Rejected').length;
-  const total=R.length, fin=finished.length;
+  const total=R.length;
+  const fin=sumW(R); // weighted score: Done=1, Pend.Regional=1, MPC any=0.5, else 0
   const pct=total?Math.round(fin/total*100):0;
 
   const totalSKU=R.reduce((s,r)=>s+(r.skuAdded||0),0);
   document.getElementById('s-tot').textContent=total.toLocaleString();
-  document.getElementById('s-done').textContent=fin.toLocaleString();
+  document.getElementById('s-done').textContent=fmtW(fin);
   document.getElementById('s-pct').textContent=pct+'%';
   document.getElementById('s-sku').textContent=totalSKU.toLocaleString();
   document.getElementById('s-pend').textContent=pend.toLocaleString();
   document.getElementById('s-pfb').textContent=pfb.toLocaleString();
+  document.getElementById('s-pam').textContent=pam.toLocaleString();
   document.getElementById('s-rej').textContent=rej.toLocaleString();
-  document.getElementById('pfrac').textContent=`${fin.toLocaleString()} finished / ${total.toLocaleString()} total`;
+  document.getElementById('pfrac').textContent=`${fmtW(fin)} score / ${total.toLocaleString()} total`;
   document.getElementById('pfill').style.width=pct+'%';
-  document.getElementById('pdet').textContent=`${pct}% finish rate · ${pend} pending · ${pfb} pending feedback · ${rej} rejected`;
+  document.getElementById('pdet').textContent=`${pct}% score rate · ${pend} pending · ${pfb} pend.feedback · ${pam>0?pam+' pend.AM · ':''}${rej} rejected`;
 
   const todayOv=todayISO();
   const yesterdayOv=_isoAdd(todayOv,-1);
   const lb=TEAM.map(o=>{
-    const n=finished.filter(r=>r.owner===o).length;
+    const n=sumW(R.filter(r=>r.owner===o));
     const sku=R.filter(r=>r.owner===o).reduce((s,r)=>s+(r.skuAdded||0),0);
-    const yestN=R.filter(r=>isFinished(r)&&r.endISO===yesterdayOv&&r.owner===o).length;
+    const yestN=sumW(R.filter(r=>r.endISO===yesterdayOv&&r.owner===o));
     return {o,n,sku,yestN};
   }).sort((a,b)=>b.n-a.n);
   const mx=lb[0]?.n||1;
   document.getElementById('lb').innerHTML=lb.map(e=>{
-    const deltaHtml=e.yestN>0?`<span style="font-size:10px;color:var(--gr);min-width:38px;text-align:right">▲${e.yestN} yest</span>`:'<span style="font-size:10px;color:var(--mu);min-width:38px;text-align:right">—</span>';
+    const deltaHtml=e.yestN>0?`<span style="font-size:10px;color:var(--gr);min-width:38px;text-align:right">▲${fmtW(e.yestN)} yest</span>`:'<span style="font-size:10px;color:var(--mu);min-width:38px;text-align:right">—</span>';
     return `<div class="lrow">
       <div class="av" style="background:${COLORS[e.o]};width:30px;height:30px">${ini(e.o)}</div>
       <div class="lname">${e.o}</div>
       <div><div class="lbar"><div class="lbf" style="width:${Math.round(e.n/mx*100)}%"></div></div></div>
-      <div class="lcount">${e.n.toLocaleString()}</div>
+      <div class="lcount">${fmtW(e.n)}</div>
       ${deltaHtml}
       <div style="font-size:10px;color:var(--bl);min-width:50px;text-align:right" title="SKU added">+${e.sku.toLocaleString()} SKU</div>
     </div>`;
@@ -1725,9 +1744,10 @@ function renderOverview(){
   rejRows.forEach(r=>{const d=r.startISO;if(!d)return;const age=Math.floor((nowMs-new Date(d).getTime())/86400000);if(age>7)rejAging.gt7++;else if(age>=3)rejAging.d3_7++;else rejAging.lt3++;});
   const rejAlertBadge=rejAging.gt7>0?`<span style="font-size:10px;background:var(--re);color:#fff;padding:1px 6px;border-radius:10px;margin-left:6px">🚨 ${rejAging.gt7} over 7d</span>`:'';
   document.getElementById('qs').innerHTML=`
-    <div class="qrow"><div class="qlbl"><span class="dot" style="background:var(--gr)"></span>Finished (has End Date)</div><div style="font-weight:700">${fin.toLocaleString()}</div></div>
+    <div class="qrow"><div class="qlbl"><span class="dot" style="background:var(--gr)"></span>Score (Weighted)</div><div style="font-weight:700">${fmtW(fin)}</div></div>
     <div class="qrow"><div class="qlbl"><span class="dot" style="background:var(--ye)"></span>Pending</div><div style="font-weight:700">${pend.toLocaleString()}</div></div>
     <div class="qrow"><div class="qlbl"><span class="dot" style="background:var(--bl)"></span>Pending Feedback</div><div style="font-weight:700;color:var(--bl)">${pfb.toLocaleString()}</div></div>
+    ${pam>0?`<div class="qrow" style="background:#fff7ed;border-radius:6px;padding:4px 8px"><div class="qlbl"><span class="dot" style="background:#f97316"></span><strong style="color:#f97316">Pend. AM Feedback</strong></div><div style="font-weight:800;color:#f97316">${pam.toLocaleString()}</div></div>`:''}
     <div class="qrow"><div class="qlbl"><span class="dot" style="background:var(--re)"></span>Rejected ${rejAlertBadge}</div><div style="font-weight:700">${rej.toLocaleString()}</div></div>
     ${rej>0?`<div style="margin-top:8px;padding:8px;background:var(--bg2);border-radius:var(--rs);font-size:11px">
       <div style="font-weight:600;margin-bottom:5px;color:var(--mu)">Rejected aging</div>
@@ -1741,7 +1761,7 @@ function renderOverview(){
 
   const today=todayISO();
   const day=new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'});
-  const cnts=TEAM.map(o=>({o,n:R.filter(r=>r.owner===o&&isFinished(r)&&r.endISO===today).length})).sort((a,b)=>b.n-a.n);
+  const cnts=TEAM.map(o=>({o,n:sumW(R.filter(r=>r.owner===o&&r.endISO===today))})).sort((a,b)=>b.n-a.n);
   const any=cnts.some(c=>c.n>0);
   document.getElementById('topdate').textContent=`⭐ Top Performer · ${day}`;
   document.getElementById('lowdate').textContent=`💪 Needs a Push · ${day}`;
@@ -1839,10 +1859,10 @@ function renderDailyProgress(){
   const agents=emp?[emp]:TEAM;
   const dayRows=R.filter(r=>isFinished(r)&&r.endISO===day&&(emp?r.owner===emp:true));
   const lbl=new Date(day+'T12:00:00').toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
-  const total=dayRows.length;
+  const total=sumW(dayRows);
   const queueAgents=agents.filter(o=>(AGENT_MODES[o]||{}).mode!=='project');
-  const queueTotal =dayRows.filter(r=>queueAgents.includes(r.owner)).length;
-  const projTotal  =total-queueTotal;
+  const queueTotal =sumW(dayRows.filter(r=>queueAgents.includes(r.owner)));
+  const projTotal  =sumW(dayRows.filter(r=>!queueAgents.includes(r.owner)));
   let html=`<div style="font-size:12px;color:var(--mu);margin-bottom:12px">
     📅 ${lbl} ·
     <strong style="color:var(--gr)">Queue: ${queueTotal}</strong>
@@ -1851,7 +1871,7 @@ function renderDailyProgress(){
   </div>`;
   html+=`<div class="g4">`;
   agents.forEach(o=>{
-    const n=R.filter(r=>isFinished(r)&&r.endISO===day&&r.owner===o).length;
+    const n=sumW(R.filter(r=>r.endISO===day&&r.owner===o));
     const tgt=getAgentTarget(o,day);
     const onLeave=isAgentOnLeave(o,day);
     const attSt=getAttStatus(o,day);
@@ -1912,7 +1932,7 @@ function renderDaily(){
     const dr=R.filter(r=>r.endISO===day.iso&&isFinished(r));
     const hasLeave=TEAM.some(o=>isAgentOnLeave(o,day.iso));
     if(!dr.length&&day.iso!==todayISO()&&!hasLeave) return;
-    const ms=TEAM.map(o=>({o,n:dr.filter(r=>r.owner===o).length,tgt:getAgentTarget(o,day.iso),onLeave:isAgentOnLeave(o,day.iso),attSt:getAttStatus(o,day.iso),isProject:(AGENT_MODES[o]||{}).mode==='project',projName:(AGENT_MODES[o]||{}).projectName||'Special Project'}));
+    const ms=TEAM.map(o=>({o,n:sumW(dr.filter(r=>r.owner===o)),tgt:getAgentTarget(o,day.iso),onLeave:isAgentOnLeave(o,day.iso),attSt:getAttStatus(o,day.iso),isProject:(AGENT_MODES[o]||{}).mode==='project',projName:(AGENT_MODES[o]||{}).projectName||'Special Project'}));
     const queueMs=ms.filter(m=>!m.isProject);
     const queueTot=queueMs.filter(m=>!m.onLeave).reduce((s,m)=>s+m.n,0);
     const projTot=ms.filter(m=>m.isProject&&!m.onLeave).reduce((s,m)=>s+m.n,0);
@@ -1955,12 +1975,12 @@ function renderDD(){
   const emp=document.getElementById('dd-emp').value, view=document.getElementById('dd-view').value, el=document.getElementById('dd-body');
   if(!emp){el.innerHTML='<div style="color:var(--mu);padding:40px;text-align:center">Select an employee above</div>';return;}
   const eR=R.filter(r=>r.owner===emp), finR=eR.filter(isFinished), today=todayISO(), thisM=today.slice(0,7);
-  const mom={};finR.forEach(r=>{if(r.endISO){const m=r.endISO.slice(0,7);mom[m]=(mom[m]||0)+1;}});const momK=Object.keys(mom).sort();
+  const mom={};finR.forEach(r=>{if(r.endISO){const m=r.endISO.slice(0,7);mom[m]=(mom[m]||0)+caseWeight(r);}});const momK=Object.keys(mom).sort();
   const dod={};for(let i=29;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);dod[`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`]=0;}
-  finR.forEach(r=>{if(r.endISO in dod)dod[r.endISO]++;});const dodK=Object.keys(dod).sort();
-  const todayCnt=finR.filter(r=>r.endISO===today).length, monthCnt=mom[thisM]||0;
+  finR.forEach(r=>{if(r.endISO in dod)dod[r.endISO]+=caseWeight(r);});const dodK=Object.keys(dod).sort();
+  const todayCnt=sumW(finR.filter(r=>r.endISO===today)), monthCnt=mom[thisM]||0;
 
-  let html=`<div class="mstats"><div class="mstat"><div class="msv" style="color:var(--or)">${finR.length.toLocaleString()}</div><div class="msl">Total Finished (All Time)</div></div><div class="mstat"><div class="msv" style="color:var(--gr)">${todayCnt}</div><div class="msl">Finished Today</div></div><div class="mstat"><div class="msv" style="color:var(--bl)">${monthCnt}</div><div class="msl">Finished This Month</div></div></div>`;
+  let html=`<div class="mstats"><div class="mstat"><div class="msv" style="color:var(--or)">${fmtW(sumW(finR))}</div><div class="msl">Total Score (All Time)</div></div><div class="mstat"><div class="msv" style="color:var(--gr)">${fmtW(todayCnt)}</div><div class="msl">Score Today</div></div><div class="mstat"><div class="msv" style="color:var(--bl)">${fmtW(monthCnt)}</div><div class="msl">Score This Month</div></div></div>`;
 
   if(view==='dod'||view==='both'){
     const vals=dodK.map(d=>dod[d]),mx=Math.max(...vals,1);
@@ -2392,9 +2412,9 @@ function renderAgentOverview(){
 
   // ── SF cases helpers ────────────────────────────────────────────────────
   const finished  = R.filter(isFinished);
-  const sfToday   = (o) => R.filter(r=>isFinished(r)&&r.endISO===today&&r.owner===o).length;
-  const sfWeek    = (o) => R.filter(r=>isFinished(r)&&r.endISO>=wkRange.start&&r.endISO<=wkRange.end&&r.owner===o).length;
-  const sfYest    = (o) => R.filter(r=>isFinished(r)&&r.endISO===yest&&r.owner===o).length;
+  const sfToday   = (o) => sumW(R.filter(r=>r.endISO===today&&r.owner===o));
+  const sfWeek    = (o) => sumW(R.filter(r=>r.endISO>=wkRange.start&&r.endISO<=wkRange.end&&r.owner===o));
+  const sfYest    = (o) => sumW(R.filter(r=>r.endISO===yest&&r.owner===o));
 
   // ── Per-agent cards ─────────────────────────────────────────────────────
   const grid = TEAM.map(o => {
@@ -3407,7 +3427,7 @@ function waTemplate(type){
     const TARGET_=15;
     const thisM=todayISO_.slice(0,7);
     TEAM.forEach(function(n){
-      const done=R.filter(function(r){return r.owner===n&&r.endISO===todayISO_;}).length;
+      const done=sumW(R.filter(function(r){return r.owner===n&&r.endISO===todayISO_;}));
       const tgt=(AGENT_TARGETS[n]&&AGENT_TARGETS[n][thisM])||TARGET_;
       const pct=Math.round(done/tgt*100);
       const icon=pct>=120?'🚀':pct>=80?'✅':pct>=50?'⚠️':'🔴';
@@ -3577,7 +3597,7 @@ function renderOrgView() {
   }
 
   function countInRange(agent, start, end) {
-    return R.filter(r => isFinished(r) && r.owner === agent && r.endISO >= start && r.endISO <= end).length;
+    return sumW(R.filter(r => isFinished(r) && r.owner === agent && r.endISO >= start && r.endISO <= end));
   }
 
   // working days from start of toDate's month up to toDate
